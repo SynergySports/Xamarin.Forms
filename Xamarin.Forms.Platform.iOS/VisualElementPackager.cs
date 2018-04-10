@@ -100,6 +100,8 @@ namespace Xamarin.Forms.Platform.MacOS
 
 			if (Renderer.ViewController != null && viewRenderer.ViewController != null)
 				viewRenderer.ViewController.RemoveFromParentViewController();
+
+			viewRenderer.Dispose();
 		}
 
 		void EnsureChildrenOrder()
