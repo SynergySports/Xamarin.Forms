@@ -54,6 +54,22 @@ namespace Xamarin.Forms.Platform.MacOS
 
 			if (disposing)
 			{
+				if (ElementController != null)
+				{
+					for (var z = 0; z < ElementController.LogicalChildren.Count; z++)
+					{
+						var child = ElementController.LogicalChildren[z] as VisualElement;
+						if (child == null)
+							continue;
+						var childRenderer = Platform.GetRenderer(child);
+
+						if (childRenderer == null)
+							continue;
+
+						childRenderer.Dispose();
+					}
+				}
+
 				SetElement(_element, null);
 				if (Renderer != null)
 				{
@@ -100,8 +116,6 @@ namespace Xamarin.Forms.Platform.MacOS
 
 			if (Renderer.ViewController != null && viewRenderer.ViewController != null)
 				viewRenderer.ViewController.RemoveFromParentViewController();
-
-			viewRenderer.Dispose();
 		}
 
 		void EnsureChildrenOrder()
