@@ -4,23 +4,29 @@ using AppKit;
 
 namespace Xamarin.Forms.Platform.macOS.Extensions
 {
-	internal static class NSMenuExtensions
+  public static class NSMenuExtensions
 	{
-		public static NSMenu ToNSMenu(this Menu menus, NSMenu nsMenu = null)
+    public static NSMenu ToNSMenu(this Menu menus, NSMenu nsMenu = null, Action<MenuItem, NSMenuItem> propertiesBinder = null, Action<MenuItem, NSMenuItem> onActivated = null)
 		{
 			if (nsMenu == null)
 				nsMenu = new NSMenu(menus.Text ?? "");
-			foreach (var menu in menus)
+
+      if(propertiesBinder == null)
+      {
+        propertiesBinder = BindProperties;
+      }
+     
+      foreach (var menu in menus)
 			{
 				var menuItem = new NSMenuItem(menu.Text ?? "");
 				var subMenu = new NSMenu(menu.Text ?? "");
 				menuItem.Submenu = subMenu;
 				foreach (var item in menu.Items)
 				{
-					var subMenuItem = item.ToNSMenuItem();
+          var subMenuItem = item.ToNSMenuItem(onActivated: onActivated);         
 					GetAccelerators(subMenuItem, item);
 					subMenu.AddItem(subMenuItem);
-					item.PropertyChanged += (sender, e) => (sender as MenuItem)?.UpdateNSMenuItem(subMenuItem, new string[] { e.PropertyName });
+          propertiesBinder(item, subMenuItem);
 				}
 				nsMenu.AddItem(menuItem);
 				menu.ToNSMenu(subMenu);
@@ -29,18 +35,34 @@ namespace Xamarin.Forms.Platform.macOS.Extensions
 		}
 
 
-		public static NSMenuItem ToNSMenuItem(this MenuItem menuItem, int i = -1)
+    public static NSMenuItem ToNSMenuItem(this MenuItem menuItem, int i = -1, Action<MenuItem, NSMenuItem> onActivated = null)
 		{
 			var nsMenuItem = new NSMenuItem(menuItem.Text ?? "");
 			if (i != -1)
 				nsMenuItem.Tag = i;
+
+      var onActivateAction = onActivated;
+      if(onActivateAction == null)
+      {
+        onActivateAction = (arg1, arg2) => arg1.Activate();
+      }
+      else
+      {
+        onActivateAction = (arg1, arg2) => {
+          onActivated(arg1, arg2);
+          arg1.Activate(); };
+      }
 			nsMenuItem.Enabled = menuItem.IsEnabled;
-			nsMenuItem.Activated += (sender, e) => menuItem.Activate();
+      nsMenuItem.Activated += (sender, e) => onActivateAction(menuItem, nsMenuItem);
 			if (!string.IsNullOrEmpty(menuItem.Icon))
 				nsMenuItem.Image = new NSImage(menuItem.Icon);
 
 			return nsMenuItem;
 		}
+
+    public static void BindProperties(MenuItem item, NSMenuItem nativeItem) => 
+      item.PropertyChanged += (sender, e) => (sender as MenuItem)?.UpdateNSMenuItem(nativeItem, new string[] { e.PropertyName });
+
 
 		public static void UpdateNSMenuItem(this MenuItem item, NSMenuItem menuItem, string[] properties)
 		{

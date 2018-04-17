@@ -11,6 +11,8 @@ namespace Xamarin.Forms.Platform.MacOS
 		Application _application;
 		bool _isSuspended;
 
+    public Action<MenuItem, NSMenuItem> NativeMenuActivated { get; set; }
+    public Action<MenuItem, NSMenuItem> NativeMenuPropertiesBinding { get; set; }
 		public abstract NSWindow MainWindow { get; }
 
 		protected override void Dispose(bool disposing)
@@ -114,7 +116,7 @@ namespace Xamarin.Forms.Platform.MacOS
 			}
 				
 			ClearNSMenu(nsMenu);
-			Element.GetMenu(_application).ToNSMenu(nsMenu);
+      Element.GetMenu(_application).ToNSMenu(nsMenu, NativeMenuPropertiesBinding, NativeMenuActivated);
 		}
 
 		static void ClearNSMenu(NSMenu menu)
