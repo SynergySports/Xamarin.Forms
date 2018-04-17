@@ -161,11 +161,11 @@ namespace Xamarin.Forms.Xaml
 			return false;
 		}
 
-		bool IsResourceDictionary() => XmlType.Name == "ResourceDictionary";
+		//bool IsResourceDictionary() => XmlType.Name == "ResourceDictionary";
 
 		protected bool SkipChildren(IXamlNodeVisitor visitor, INode parentNode) =>
 			(visitor.StopOnDataTemplate && IsDataTemplate(parentNode)) ||
-			(visitor.StopOnResourceDictionary && IsResourceDictionary());
+			(visitor.StopOnResourceDictionary && visitor.IsResourceDictionary(this));
 
 		protected bool SkipVisitNode(IXamlNodeVisitor visitor, INode parentNode) =>
 			!visitor.VisitNodeOnDataTemplate && IsDataTemplate(parentNode);

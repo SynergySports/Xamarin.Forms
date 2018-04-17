@@ -29,6 +29,13 @@ namespace Xamarin.Forms.Build.Tasks
 		public bool StopOnResourceDictionary => false;
 		public bool VisitNodeOnDataTemplate => true;
 
+		public bool IsResourceDictionary(ElementNode node)
+		{
+			var parentVar = Context.Variables[(IElementNode)node];
+			return parentVar.VariableType.FullName == "Xamarin.Forms.ResourceDictionary"
+				|| parentVar.VariableType.Resolve().BaseType?.FullName == "Xamarin.Forms.ResourceDictionary";
+		}
+
 		public void Visit(ValueNode node, INode parentNode)
 		{
 		}

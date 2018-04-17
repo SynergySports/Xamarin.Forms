@@ -14,6 +14,8 @@ namespace Xamarin.Forms.Xaml
 		void Visit(ElementNode node, INode parentNode);
 		void Visit(RootNode node, INode parentNode);
 		void Visit(ListNode node, INode parentNode);
+
+		bool IsResourceDictionary(ElementNode node);
 	}
 
 	enum TreeVisitingMode {
@@ -37,6 +39,8 @@ namespace Xamarin.Forms.Xaml
 		public bool StopOnDataTemplate { get; }
 		public bool StopOnResourceDictionary { get; }
 		public bool VisitNodeOnDataTemplate { get; }
+
+		public bool IsResourceDictionary(ElementNode node) => false;
 
 		public void Visit(ValueNode node, INode parentNode)
 		{
