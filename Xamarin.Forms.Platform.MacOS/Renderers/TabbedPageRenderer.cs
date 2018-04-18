@@ -33,7 +33,7 @@ namespace Xamarin.Forms.Platform.MacOS
 			return NativeView.GetSizeRequest(widthConstraint, heightConstraint);
 		}
 
-		public NSView NativeView => View;
+    public NSView NativeView { get => _disposed ? null : View; }
 
 		public void SetElement(VisualElement element)
 		{
