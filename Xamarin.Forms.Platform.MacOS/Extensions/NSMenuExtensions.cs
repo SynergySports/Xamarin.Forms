@@ -29,7 +29,7 @@ namespace Xamarin.Forms.Platform.macOS.Extensions
           propertiesBinder(item, subMenuItem);
 				}
 				nsMenu.AddItem(menuItem);
-				menu.ToNSMenu(subMenu);
+        menu.ToNSMenu(subMenu, propertiesBinder, onActivated);
 			}
 			return nsMenu;
 		}
