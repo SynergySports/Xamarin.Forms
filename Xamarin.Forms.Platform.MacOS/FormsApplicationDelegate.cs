@@ -116,10 +116,15 @@ namespace Xamarin.Forms.Platform.MacOS
 			}
 				
 			ClearNSMenu(nsMenu);
-      Element.GetMenu(_application).ToNSMenu(nsMenu, NativeMenuPropertiesBinding, NativeMenuActivated);
+      SetupMainAppMenu(nsMenu);
 		}
 
-		static void ClearNSMenu(NSMenu menu)
+    protected virtual void SetupMainAppMenu(NSMenu menu)
+    {
+      Element.GetMenu(_application).ToNSMenu(menu, NativeMenuPropertiesBinding, NativeMenuActivated);
+    }
+
+    protected virtual void ClearNSMenu(NSMenu menu)
 		{
 			//for now we can't remove the 1st menu item		
 			for (var i = menu.Count - 1; i > 0; i--)
