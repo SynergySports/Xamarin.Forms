@@ -110,6 +110,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Properties\AssemblyInfo.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Extensions\CellExtensions.cs" />
     <Compile Include="CADisplayLinkTicker.cs" />
+    <Compile Include="DisposeHelpers.cs" />
     <Compile Include="EffectUtilities.cs" />
     <Compile Include="ExportCellAttribute.cs" />
     <Compile Include="ExportImageSourceHandlerAttribute.cs" />
@@ -117,14 +118,22 @@
     <Compile Include="Extensions\ArrayExtensions.cs" />
     <Compile Include="Extensions\FlowDirectionExtensions.cs" />
     <Compile Include="Extensions\PlatformConfigurationExtensions.cs" />
+    <Compile Include="Extensions\LabelExtensions.cs" />
     <Compile Include="Extensions\VisualElementExtensions.cs" />
     <Compile Include="Flags.cs" />
+    <Compile Include="Renderers\ImageElementManager.cs" />
+    <Compile Include="IVisualNativeElementRenderer.cs" />
     <Compile Include="NativeViewWrapper.cs" />
     <Compile Include="NativeViewWrapperRenderer.cs" />
     <Compile Include="PlatformEffect.cs" />
     <Compile Include="Renderers\AlignmentExtensions.cs" />
     <Compile Include="Forms.cs" />
     <Compile Include="PageExtensions.cs" />
+    <Compile Include="Renderers\WkWebViewRenderer.cs" />
+    <Compile Include="Renderers\BorderElementManager.cs" />
+    <Compile Include="Renderers\ButtonElementManager.cs" />
+    <Compile Include="Renderers\IImageVisualElementRenderer.cs" />
+    <Compile Include="Renderers\ImageButtonRenderer.cs" />
     <Compile Include="Resources\StringResources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>

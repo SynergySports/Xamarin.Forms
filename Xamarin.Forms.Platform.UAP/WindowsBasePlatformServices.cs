@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Reflection;
@@ -18,6 +19,7 @@ using Windows.Storage.Streams;
 using Windows.System;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
+using Windows.UI.Xaml.Media;
 using Xamarin.Forms.Internals;
 
 namespace Xamarin.Forms.Platform.UWP
@@ -113,13 +115,7 @@ namespace Xamarin.Forms.Platform.UWP
 			return new WindowsIsolatedStorage(ApplicationData.Current.LocalFolder);
 		}
 
-		// Per https://docs.microsoft.com/en-us/windows-hardware/drivers/partnerapps/create-a-kiosk-app-for-assigned-access:
-		// "Each view or window has its own dispatcher. In assigned access mode, you should not use the MainView dispatcher, 
-		// instead you should use the CurrentView dispatcher." Checking to see if this isn't null (i.e. the current window is
-		// running above lock) calls through GetCurrentView(), and otherwise through MainView.
-		public bool IsInvokeRequired => LockApplicationHost.GetForCurrentView() != null
-			? !CoreApplication.GetCurrentView().Dispatcher.HasThreadAccess
-			: !CoreApplication.MainView.CoreWindow.Dispatcher.HasThreadAccess;
+		public bool IsInvokeRequired => !_dispatcher.HasThreadAccess;
 
 		public string RuntimePlatform => Device.UWP;
 
@@ -130,14 +126,21 @@ namespace Xamarin.Forms.Platform.UWP
 
 		public void StartTimer(TimeSpan interval, Func<bool> callback)
 		{
-			var timer = new DispatcherTimer { Interval = interval };
-			timer.Start();
-			timer.Tick += (sender, args) =>
+			var timerTick = 0L;
+			var stopWatch = new Stopwatch();
+			stopWatch.Start();
+			void renderingFrameEventHandler(object sender, object args)
 			{
+				var newTimerTick = stopWatch.ElapsedMilliseconds / (long)interval.TotalMilliseconds;
+				if (newTimerTick == timerTick)
+					return;
+				timerTick = newTimerTick;
 				bool result = callback();
-				if (!result)
-					timer.Stop();
-			};
+				if (result)
+					return;
+				CompositionTarget.Rendering -= renderingFrameEventHandler;
+			}
+			CompositionTarget.Rendering += renderingFrameEventHandler;
 		}
 
 		public void QuitApplication()

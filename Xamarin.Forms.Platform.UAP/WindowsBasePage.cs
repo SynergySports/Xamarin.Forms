@@ -15,7 +15,7 @@ namespace Xamarin.Forms.Platform.UWP
 			}
 		}
 
-		protected Platform Platform { get; private set; }
+		internal Platform Platform { get; private set; }
 
 		protected abstract Platform CreatePlatform();
 
@@ -26,7 +26,8 @@ namespace Xamarin.Forms.Platform.UWP
 
 			Application.SetCurrentApplication(application);
 			Platform = CreatePlatform();
-			Platform.SetPage(Application.Current.MainPage);
+			if (Application.Current.MainPage != null)
+				Platform.SetPage(Application.Current.MainPage);
 			application.PropertyChanged += OnApplicationPropertyChanged;
 
 			Application.Current.SendStart();
@@ -40,15 +41,19 @@ namespace Xamarin.Forms.Platform.UWP
 
 		void OnApplicationResuming(object sender, object e)
 		{
-			Application.Current.SendResume();
+			Application.Current?.SendResume();
 		}
 
 		async void OnApplicationSuspending(object sender, SuspendingEventArgs e)
 		{
+			var sendSleepTask = Application.Current?.SendSleepAsync();
+			if (sendSleepTask == null)
+				return;
+
 			SuspendingDeferral deferral = e.SuspendingOperation.GetDeferral();
 			try
 			{
-				await Application.Current.SendSleepAsync();
+				await sendSleepTask;
 			}
 			finally
 			{

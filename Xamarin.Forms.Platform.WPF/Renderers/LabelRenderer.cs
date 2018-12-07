@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -11,7 +12,8 @@ namespace Xamarin.Forms.Platform.WPF
 	public class LabelRenderer : ViewRenderer<Label, TextBlock>
 	{
 		bool _fontApplied;
-		
+		IList<double> _inlineHeights = new List<double>();
+
 		protected override void OnElementChanged(ElementChangedEventArgs<Label> e)
 		{
 			if (e.NewElement != null)
@@ -23,6 +25,7 @@ namespace Xamarin.Forms.Platform.WPF
 
 				// Update control property 
 				UpdateText();
+				UpdateTextDecorations();
 				UpdateColor();
 				UpdateAlign();
 				UpdateFont();
@@ -32,12 +35,21 @@ namespace Xamarin.Forms.Platform.WPF
 			base.OnElementChanged(e);
 		}
 
+		public override SizeRequest GetDesiredSize(double widthConstraint, double heightConstraint)
+		{
+			var size = base.GetDesiredSize(widthConstraint, heightConstraint);
+			Control.RecalculateSpanPositions(Element, _inlineHeights);
+			return size;
+		}
+
 		protected override void OnElementPropertyChanged(object sender, PropertyChangedEventArgs e)
 		{
 			base.OnElementPropertyChanged(sender, e);
 
 			if (e.PropertyName == Label.TextProperty.PropertyName || e.PropertyName == Label.FormattedTextProperty.PropertyName)
 				UpdateText();
+			else if (e.PropertyName == Label.TextDecorationsProperty.PropertyName)
+				UpdateTextDecorations();
 			else if (e.PropertyName == Label.TextColorProperty.PropertyName)
 				UpdateColor();
 			else if (e.PropertyName == Label.HorizontalTextAlignmentProperty.PropertyName || e.PropertyName == Label.VerticalTextAlignmentProperty.PropertyName)
@@ -52,6 +64,29 @@ namespace Xamarin.Forms.Platform.WPF
 		{
 			Control.UpdateDependencyColor(TextBlock.BackgroundProperty, Element.BackgroundColor);
 		}
+
+		void UpdateTextDecorations()
+		{
+			if (!Element.IsSet(Label.TextDecorationsProperty))
+				return;
+
+			var textDecorations = Element.TextDecorations;
+
+			var newTextDecorations = new System.Windows.TextDecorationCollection(Control.TextDecorations);
+
+			if ((textDecorations & TextDecorations.Underline) == 0)
+				newTextDecorations.TryRemove(System.Windows.TextDecorations.Underline, out newTextDecorations);
+			else
+				newTextDecorations.Add(System.Windows.TextDecorations.Underline);
+
+			if ((textDecorations & TextDecorations.Strikethrough) == 0)
+				newTextDecorations.TryRemove(System.Windows.TextDecorations.Strikethrough, out newTextDecorations);
+			else
+				newTextDecorations.Add(System.Windows.TextDecorations.Strikethrough);
+
+			Control.TextDecorations = newTextDecorations;
+		}
+
 
 		void UpdateAlign()
 		{
@@ -69,11 +104,11 @@ namespace Xamarin.Forms.Platform.WPF
 		{
 			if (Control == null || Element == null)
 				return;
-			
+
 			if (Element.TextColor != Color.Default)
 				Control.Foreground = Element.TextColor.ToBrush();
 			else
-				Control.Foreground = Brushes.Black; 
+				Control.Foreground = Brushes.Black;
 		}
 
 		void UpdateFont()
@@ -144,11 +179,21 @@ namespace Xamarin.Forms.Platform.WPF
 					FormattedString formattedText = label.FormattedText ?? label.Text;
 
 					Control.Inlines.Clear();
-					foreach (Inline inline in formattedText.ToInlines())
-						Control.Inlines.Add(inline);
+					// Have to implement a measure here, otherwise inline.ContentStart and ContentEnd will be null, when used in RecalculatePositions
+					Control.Measure(new System.Windows.Size(double.MaxValue, double.MaxValue));
+
+					var heights = new List<double>();
+					for (var i = 0; i < formattedText.Spans.Count; i++)
+					{
+						var span = formattedText.Spans[i];
+						var run = span.ToRun();
+						heights.Add(Control.FindDefaultLineHeight(run));
+						Control.Inlines.Add(run);
+					}
+					_inlineHeights = heights;
 				}
 			}
 		}
-		
+
 	}
 }

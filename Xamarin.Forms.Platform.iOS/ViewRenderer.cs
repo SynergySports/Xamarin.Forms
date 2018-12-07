@@ -18,11 +18,16 @@ using NativeControl = AppKit.NSControl;
 namespace Xamarin.Forms.Platform.MacOS
 #endif
 {
+	public interface ITabStop
+	{
+		NativeView TabStop { get; }
+	}
+
 	public abstract class ViewRenderer : ViewRenderer<View, NativeView>
 	{
 	}
 
-	public abstract class ViewRenderer<TView, TNativeView> : VisualElementRenderer<TView> where TView : View where TNativeView : NativeView
+	public abstract class ViewRenderer<TView, TNativeView> : VisualElementRenderer<TView>, IVisualNativeElementRenderer, ITabStop where TView : View where TNativeView : NativeView
 	{
 #if __MOBILE__
 		string _defaultAccessibilityLabel;
@@ -31,12 +36,40 @@ namespace Xamarin.Forms.Platform.MacOS
 #endif
 		NativeColor _defaultColor;
 
+		event EventHandler<PropertyChangedEventArgs> _elementPropertyChanged;
+		event EventHandler _controlChanging;
+		event EventHandler _controlChanged;
+
+
+
 		protected virtual TNativeView CreateNativeControl()
 		{
 			return default(TNativeView);
 		}
 
 		public TNativeView Control { get; private set; }
+		NativeView IVisualNativeElementRenderer.Control => Control;
+
+
+		event EventHandler<PropertyChangedEventArgs> IVisualNativeElementRenderer.ElementPropertyChanged
+		{
+			add { _elementPropertyChanged += value; }
+			remove { _elementPropertyChanged -= value; }
+		}
+
+		event EventHandler IVisualNativeElementRenderer.ControlChanging
+		{
+			add { _controlChanging += value; }
+			remove { _controlChanging -= value; }
+		}
+		event EventHandler IVisualNativeElementRenderer.ControlChanged
+		{
+			add { _controlChanged += value; }
+			remove { _controlChanged -= value; }
+		}
+
+
+		NativeView ITabStop.TabStop => Control;
 #if __MOBILE__
 		public override void LayoutSubviews()
 		{
@@ -116,6 +149,7 @@ namespace Xamarin.Forms.Platform.MacOS
 			}
 
 			base.OnElementPropertyChanged(sender, e);
+			_elementPropertyChanged?.Invoke(this, e);
 		}
 
 		protected override void OnRegisterEffect(PlatformEffect effect)
@@ -203,8 +237,15 @@ namespace Xamarin.Forms.Platform.MacOS
 
 		protected void SetNativeControl(TNativeView uiview)
 		{
+			_controlChanging?.Invoke(this, EventArgs.Empty);
 #if __MOBILE__
 			_defaultColor = uiview.BackgroundColor;
+
+			// UIKit UIViews created via storyboard default IsAccessibilityElement to true, BUT
+			// UIViews created programmatically default IsAccessibilityElement to false.
+			// We need to default to true to allow all elements to be accessible by default and
+			// allow users to override this later via AutomationProperties.IsInAccessibleTree
+			uiview.IsAccessibilityElement = true;
 #else
 			uiview.WantsLayer = true;
 			_defaultColor = uiview.Layer.BackgroundColor;
@@ -219,6 +260,8 @@ namespace Xamarin.Forms.Platform.MacOS
 			UpdateFlowDirection();
 
 			AddSubview(uiview);
+
+			_controlChanged?.Invoke(this, EventArgs.Empty);
 		}
 
 #if __MOBILE__

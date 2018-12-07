@@ -10,7 +10,7 @@ using AView = Android.Views.View;
 
 namespace Xamarin.Forms.Platform.Android.FastRenderers
 {
-	public class FrameRenderer : CardView, IVisualElementRenderer, IEffectControlProvider
+	public class FrameRenderer : CardView, IVisualElementRenderer, IEffectControlProvider, IViewRenderer, ITabStop
 	{
 		float _defaultElevation = -1f;
 		float _defaultCornerRadius = -1f;
@@ -44,6 +44,8 @@ namespace Xamarin.Forms.Platform.Android.FastRenderers
 		}
 
 		protected CardView Control => this;
+
+		AView ITabStop.TabStop => this;
 
 		protected Frame Element
 		{
@@ -103,6 +105,11 @@ namespace Xamarin.Forms.Platform.Android.FastRenderers
 		void IEffectControlProvider.RegisterEffect(Effect effect)
 		{
 			_effectControlProvider.RegisterEffect(effect);
+		}
+
+		void IViewRenderer.MeasureExactly()
+		{
+			ViewRenderer.MeasureExactly(this, Element, Context);
 		}
 
 		protected override void Dispose(bool disposing)
@@ -242,7 +249,11 @@ namespace Xamarin.Forms.Platform.Android.FastRenderers
 				return;
 
 			Color borderColor = Element.BorderColor;
-			_backgroundDrawable.SetStroke(3, borderColor.IsDefault ? AColor.White : borderColor.ToAndroid());
+
+			if (borderColor.IsDefault)
+				_backgroundDrawable.SetStroke(0, AColor.Transparent);
+			else
+				_backgroundDrawable.SetStroke(3, borderColor.ToAndroid());
 		}
 
 		void UpdateShadow()

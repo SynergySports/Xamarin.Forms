@@ -3,8 +3,8 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Threading.Tasks;
 using Windows.UI.Xaml;
-using Windows.UI.Xaml.Automation;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Data;
 using Windows.UI.Xaml.Media;
 using Xamarin.Forms.Internals;
 using Xamarin.Forms.PlatformConfiguration.WindowsSpecific;
@@ -16,10 +16,14 @@ using WStackPanel = Windows.UI.Xaml.Controls.StackPanel;
 using WImage = Windows.UI.Xaml.Controls.Image;
 using WTextBlock = Windows.UI.Xaml.Controls.TextBlock;
 using Specifics = Xamarin.Forms.PlatformConfiguration.WindowsSpecific.TabbedPage;
+using VisualElementSpecifics = Xamarin.Forms.PlatformConfiguration.WindowsSpecific.VisualElement;
+using PageSpecifics = Xamarin.Forms.PlatformConfiguration.WindowsSpecific.Page;
+using Windows.UI.Xaml.Input;
 
 namespace Xamarin.Forms.Platform.UWP
 {
-	public class TabbedPageRenderer : IVisualElementRenderer, ITitleProvider, IToolbarProvider
+	public class TabbedPageRenderer : IVisualElementRenderer, ITitleProvider, IToolbarProvider, 
+		IToolBarForegroundBinder
 	{
 		const string TabBarHeaderStackPanelName = "TabbedPageHeaderStackPanel";
 		const string TabBarHeaderImageName = "TabbedPageHeaderImage";
@@ -150,6 +154,7 @@ namespace Xamarin.Forms.Platform.UWP
 			{
 				oldElement.PropertyChanged -= OnElementPropertyChanged;
 				((INotifyCollectionChanged)oldElement.Children).CollectionChanged -= OnPagesChanged;
+				Control?.GetDescendantsByName<TextBlock>(TabBarHeaderTextBlockName).ForEach(t => { t.AccessKeyInvoked -= AccessKeyInvokedForTab; });
 			}
 
 			if (element != null)
@@ -223,6 +228,8 @@ namespace Xamarin.Forms.Platform.UWP
 				UpdateBarIcons();
 			else if (e.PropertyName == Specifics.HeaderIconsSizeProperty.PropertyName)
 				UpdateBarIcons();
+			else if (e.PropertyName == PageSpecifics.ToolbarPlacementProperty.PropertyName)
+				UpdateToolbarPlacement();
 		}
 
 		void OnLoaded(object sender, RoutedEventArgs args)
@@ -232,14 +239,60 @@ namespace Xamarin.Forms.Platform.UWP
 			UpdateBarTextColor();
 			UpdateBarBackgroundColor();
 			UpdateBarIcons();
+			UpdateAccessKeys();
 		}
 
-		void OnPagesChanged(object sender, NotifyCollectionChangedEventArgs e)
+		void OnPagesChanged(object sender, NotifyCollectionChangedEventArgs e) 
 		{
 			e.Apply(Element.Children, Control.Items);
-
-			// Potential performance issue, UpdateLayout () is called for every page change
+			switch (e.Action)
+			{
+				case NotifyCollectionChangedAction.Add:
+				case NotifyCollectionChangedAction.Remove:
+				case NotifyCollectionChangedAction.Replace:
+					if (e.NewItems != null)
+						for (int i = 0; i< e.NewItems.Count; i++)
+							((Page)e.NewItems[i]).PropertyChanged += OnChildPagePropertyChanged;
+					if (e.OldItems != null)
+						for (int i = 0; i < e.OldItems.Count; i++)
+							((Page)e.OldItems[i]).PropertyChanged -= OnChildPagePropertyChanged;
+					break;
+				case NotifyCollectionChangedAction.Reset:
+					foreach (var page in Element.Children)
+						page.PropertyChanged += OnChildPagePropertyChanged;
+					break;
+			}
+			
 			Control.UpdateLayout();
+			EnsureBarColors(e.Action);
+		}
+
+		void EnsureBarColors(NotifyCollectionChangedAction action)
+		{
+			switch (action)
+			{
+				case NotifyCollectionChangedAction.Add:
+				case NotifyCollectionChangedAction.Replace:
+				case NotifyCollectionChangedAction.Reset:
+					// Need to make sure any new items have the correct fore/background colors
+					ApplyBarBackgroundColor(true);
+					ApplyBarTextColor(true);
+					break;
+			}
+		}
+
+		void OnChildPagePropertyChanged(object sender, PropertyChangedEventArgs e) {
+			var page = sender as Page;
+			if (page != null)
+			{
+				// If AccessKeys properties are updated on a child (tab) we want to
+				// update the access key on the native control.
+				if (e.PropertyName == VisualElementSpecifics.AccessKeyProperty.PropertyName ||
+					e.PropertyName == VisualElementSpecifics.AccessKeyPlacementProperty.PropertyName ||
+					e.PropertyName == VisualElementSpecifics.AccessKeyHorizontalOffsetProperty.PropertyName ||
+					e.PropertyName == VisualElementSpecifics.AccessKeyVerticalOffsetProperty.PropertyName)
+					UpdateAccessKeys();
+			}
 		}
 
 		void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -286,11 +339,17 @@ namespace Xamarin.Forms.Platform.UWP
 			if (barBackgroundColor == _barBackgroundColor) return;
 			_barBackgroundColor = barBackgroundColor;
 
+			ApplyBarBackgroundColor();
+		}
+
+		void ApplyBarBackgroundColor(bool force = false)
+		{
 			var controlToolbarBackground = Control.ToolbarBackground;
-			if (controlToolbarBackground == null && barBackgroundColor.IsDefault) return;
+			if (controlToolbarBackground == null && _barBackgroundColor.IsDefault) return;
 
 			var brush = GetBarBackgroundBrush();
-			if (brush == controlToolbarBackground) return;
+			if (brush == controlToolbarBackground && !force) 
+				return;
 
 			TitleProvider.BarBackgroundBrush = brush;
 
@@ -308,11 +367,16 @@ namespace Xamarin.Forms.Platform.UWP
 			if (barTextColor == _barTextColor) return;
 			_barTextColor = barTextColor;
 
+			ApplyBarTextColor();
+		}
+
+		void ApplyBarTextColor(bool force = false)
+		{
 			var controlToolbarForeground = Control.ToolbarForeground;
-			if (controlToolbarForeground == null && barTextColor.IsDefault) return;
+			if (controlToolbarForeground == null && _barTextColor.IsDefault) return;
 
 			var brush = GetBarForegroundBrush();
-			if (brush == controlToolbarForeground)
+			if (brush == controlToolbarForeground && !force)
 				return;
 
 			TitleProvider.BarForegroundBrush = brush;
@@ -344,90 +408,132 @@ namespace Xamarin.Forms.Platform.UWP
 			Control.SelectedItem = page;
 		}
 
+		void UpdateBarIcons()
+		{
+			if (Control == null || Element == null)
+				return;
+
+			if (!Element.IsSet(Specifics.HeaderIconsEnabledProperty))
+				return;
+
+			bool headerIconsEnabled = Element.OnThisPlatform().GetHeaderIconsEnabled();
+			bool invalidateMeasure = false;
+
+			// Get all stack panels affected by update.
+			var stackPanels = Control.GetDescendantsByName<WStackPanel>(TabBarHeaderStackPanelName);
+			foreach (var stackPanel in stackPanels)
+			{
+				int stackPanelChildCount = stackPanel.Children.Count;
+				for (int i = 0; i < stackPanelChildCount; i++)
+				{
+					var stackPanelItem = stackPanel.Children[i];
+					if (stackPanelItem is WImage tabBarImage)
+					{
+						// Update icon image.
+						if (tabBarImage.GetValue(FrameworkElement.NameProperty).ToString() == TabBarHeaderImageName)
+						{
+							if (headerIconsEnabled)
+							{
+								if (Element.IsSet(Specifics.HeaderIconsSizeProperty))
+								{
+									Size iconSize = Element.OnThisPlatform().GetHeaderIconsSize();
+									tabBarImage.Height = iconSize.Height;
+									tabBarImage.Width = iconSize.Width;
+								}
+								tabBarImage.HorizontalAlignment = WHorizontalAlignment.Center;
+								tabBarImage.Visibility = WVisibility.Visible;
+							}
+							else
+							{
+								tabBarImage.Visibility = WVisibility.Collapsed;
+							}
+
+							invalidateMeasure = true;
+						}
+					}
+					else if (stackPanelItem is WTextBlock tabBarTextblock)
+					{
+						// Update text block.
+						if (tabBarTextblock.GetValue(FrameworkElement.NameProperty).ToString() == TabBarHeaderTextBlockName)
+						{
+							if (headerIconsEnabled)
+							{
+								// Remember old values so we can restore them if icons are collapsed.
+								// NOTE, since all Textblock instances in this stack panel comes from the same
+								// style, we just keep one copy of the value (since they should be identical).
+								if (tabBarTextblock.TextAlignment != WTextAlignment.Center)
+								{
+									_oldBarTextBlockTextAlignment = tabBarTextblock.TextAlignment;
+									tabBarTextblock.TextAlignment = WTextAlignment.Center;
+								}
+
+								if (tabBarTextblock.HorizontalAlignment != WHorizontalAlignment.Center)
+								{
+									_oldBarTextBlockHorinzontalAlignment = tabBarTextblock.HorizontalAlignment;
+									tabBarTextblock.HorizontalAlignment = WHorizontalAlignment.Center;
+								}
+							}
+							else
+							{
+								// Restore old values.
+								tabBarTextblock.TextAlignment = _oldBarTextBlockTextAlignment;
+								tabBarTextblock.HorizontalAlignment = _oldBarTextBlockHorinzontalAlignment;
+							}
+						}
+					}
+				}
+			}
+
+			// If items have been made visible or collapsed in panel, invalidate current control measures.
+			if (invalidateMeasure)
+				Control.InvalidateMeasure();
+		}
+
 		void UpdateToolbarPlacement()
 		{
 			Control.ToolbarPlacement = Element.OnThisPlatform().GetToolbarPlacement();
 		}
 
-		void UpdateBarIcons()
+		protected void UpdateAccessKeys()
 		{
-			if (Control == null)
-				return;
+			Control?.GetDescendantsByName<TextBlock>(TabBarHeaderTextBlockName).ForEach(UpdateAccessKey);
+		}
 
-			if (Element.IsSet(Specifics.HeaderIconsEnabledProperty))
+		void AccessKeyInvokedForTab(UIElement sender, AccessKeyInvokedEventArgs arg)
+		{
+			var tab = sender as TextBlock;
+			if (tab != null && tab.DataContext is Page page)
+				Element.CurrentPage = page;
+		}
+
+		protected void UpdateAccessKey(TextBlock control) {
+
+			if (control != null && control.DataContext is Page page)
 			{
-				bool headerIconsEnabled = Element.OnThisPlatform().GetHeaderIconsEnabled();
-				bool invalidateMeasure = false;
-
-				// Get all stack panels affected by update.
-				var stackPanels = Control.GetDescendantsByName<WStackPanel>(TabBarHeaderStackPanelName);
-				foreach (var stackPanel in stackPanels)
+				var windowsElement = page.On<PlatformConfiguration.Windows>();
+				if (page.IsSet(VisualElementSpecifics.AccessKeyProperty))
 				{
-					int stackPanelChildCount = stackPanel.Children.Count;
-					for (int i = 0; i < stackPanelChildCount; i++)
-					{
-						var stackPanelItem = stackPanel.Children[i];
-						if (stackPanelItem is WImage tabBarImage)
-						{
-							// Update icon image.
-							if (tabBarImage.GetValue(FrameworkElement.NameProperty).ToString() == TabBarHeaderImageName)
-							{
-								if (headerIconsEnabled)
-								{
-									if (Element.IsSet(Specifics.HeaderIconsSizeProperty))
-									{
-										Size iconSize = Element.OnThisPlatform().GetHeaderIconsSize();
-										tabBarImage.Height = iconSize.Height;
-										tabBarImage.Width = iconSize.Width;
-									}
-									tabBarImage.HorizontalAlignment = WHorizontalAlignment.Center;
-									tabBarImage.Visibility = WVisibility.Visible;
-								}
-								else
-								{
-									tabBarImage.Visibility = WVisibility.Collapsed;
-								}
-
-								invalidateMeasure = true;
-							}
-						}
-						else if (stackPanelItem is WTextBlock tabBarTextblock)
-						{
-							// Update text block.
-							if (tabBarTextblock.GetValue(FrameworkElement.NameProperty).ToString() == TabBarHeaderTextBlockName)
-							{
-								if (headerIconsEnabled)
-								{
-									// Remember old values so we can restore them if icons are collapsed.
-									// NOTE, since all Textblock instances in this stack panel comes from the same
-									// style, we just keep one copy of the value (since they should be identical).
-									if (tabBarTextblock.TextAlignment != WTextAlignment.Center)
-									{
-										_oldBarTextBlockTextAlignment = tabBarTextblock.TextAlignment;
-										tabBarTextblock.TextAlignment = WTextAlignment.Center;
-									}
-
-									if (tabBarTextblock.HorizontalAlignment != WHorizontalAlignment.Center)
-									{
-										_oldBarTextBlockHorinzontalAlignment = tabBarTextblock.HorizontalAlignment;
-										tabBarTextblock.HorizontalAlignment = WHorizontalAlignment.Center;
-									}
-								}
-								else
-								{
-									// Restore old values.
-									tabBarTextblock.TextAlignment = _oldBarTextBlockTextAlignment;
-									tabBarTextblock.HorizontalAlignment = _oldBarTextBlockHorinzontalAlignment;
-								}
-							}
-						}
-					}
+					control.AccessKeyInvoked += AccessKeyInvokedForTab;
 				}
-
-				// If items have been made visible or collapsed in panel, invalidate current control measures.
-				if (invalidateMeasure)
-					Control.InvalidateMeasure();
+				AccessKeyHelper.UpdateAccessKey(control, page);
 			}
+		}
+
+		public void BindForegroundColor(AppBar appBar)
+		{
+			SetAppBarForegroundBinding(appBar);
+		}
+
+		public void BindForegroundColor(AppBarButton button)
+		{
+			SetAppBarForegroundBinding(button);
+		}
+
+		void SetAppBarForegroundBinding(FrameworkElement element)
+		{
+			element.SetBinding(Windows.UI.Xaml.Controls.Control.ForegroundProperty,
+				new Windows.UI.Xaml.Data.Binding { Path = new PropertyPath("ToolbarForeground"), 
+					Source = Control, RelativeSource = new RelativeSource { Mode = RelativeSourceMode.TemplatedParent } });
 		}
 	}
 }

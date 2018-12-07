@@ -43,7 +43,7 @@ namespace Xamarin.Forms.Platform.UWP
 			_propertyChangedHandler = OnCellPropertyChanged;
 		}
 
-		public Cell Cell		
+		public Cell Cell
 		{
 			get { return (Cell)GetValue(CellProperty); }
 			set { SetValue(CellProperty, value); }
@@ -151,7 +151,7 @@ namespace Xamarin.Forms.Platform.UWP
 
 		void OnContextActionsChanged(object sender, NotifyCollectionChangedEventArgs e)
 		{
-			var flyout = FlyoutBase.GetAttachedFlyout(CellContent) as MenuFlyout;
+			var flyout = GetAttachedFlyout();
 			if (flyout != null)
 			{
 				flyout.Items.Clear();
@@ -161,6 +161,9 @@ namespace Xamarin.Forms.Platform.UWP
 
 		void OnDataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
 		{
+			if (args.NewValue == null)
+				return;
+
 			// We don't want to set the Cell until the ListView is realized, just in case the 
 			// Cell has an ItemTemplate. Instead, we'll store the new data item, and it will be
 			// set on MeasureOverrideDelegate. However, if the parent is a TableView, we'll already 
@@ -177,9 +180,30 @@ namespace Xamarin.Forms.Platform.UWP
 				OpenContextMenu();
 		}
 
+		/// <summary>
+		/// To check the context, not just the text.
+		/// </summary>
+		MenuFlyout GetAttachedFlyout()
+		{
+			if (FlyoutBase.GetAttachedFlyout(CellContent) is MenuFlyout flyout)
+			{
+				var actions = Cell.ContextActions;
+				if (flyout.Items.Count != actions.Count)
+					return null;
+
+				for (int i = 0; i < flyout.Items.Count; i++)
+				{
+					if (flyout.Items[i].DataContext != actions[i])
+						return null;
+				}
+				return flyout;
+			}
+			return null;
+		}
+
 		void OpenContextMenu()
 		{
-			if (FlyoutBase.GetAttachedFlyout(CellContent) == null)
+			if (GetAttachedFlyout() == null)
 			{
 				var flyout = new MenuFlyout();
 				SetupMenuItems(flyout);
@@ -222,16 +246,7 @@ namespace Xamarin.Forms.Platform.UWP
 
 				if (template != null)
 				{
-					if (lv.IsGroupingEnabled)
-					{
-						cell = isGroupHeader 
-							? RealizeGroupedHeaderTemplate(lv.TemplatedItems, template, newContext) 
-							: RealizeGroupedItemTemplate(lv.TemplatedItems, template, newContext);
-					}
-					else
-					{
-						cell = RealizeItemTemplate(lv.TemplatedItems, template, newContext);
-					}
+					cell = template.CreateContent() as Cell;
 				}
 				else
 				{
@@ -335,44 +350,6 @@ namespace Xamarin.Forms.Platform.UWP
 				return;
 
 			this.UpdateFlowDirection(newCell.Parent as VisualElement);
-		}
-
-		static Cell RealizeGroupedHeaderTemplate(TemplatedItemsList<ItemsView<Cell>, Cell> templatedItems, 
-			ElementTemplate template, object context)
-		{
-			var index = templatedItems.GetGlobalIndexOfGroup(context);
-			if (index > -1)
-			{
-				return templatedItems[index];
-			}
-
-			return template.CreateContent() as Cell;
-		}
-
-		static Cell RealizeGroupedItemTemplate(ITemplatedItemsList<Cell> templatedItems, 
-			ElementTemplate template, object context)
-		{
-			var indices = templatedItems.GetGroupAndIndexOfItem(context);
-
-			if (indices.Item1 > -1 && indices.Item2 > -1)
-			{
-				var group = templatedItems.GetGroup(indices.Item1);
-				return group[indices.Item2];
-			}
-
-			return template.CreateContent() as Cell;
-		}
-
-		static Cell RealizeItemTemplate(ITemplatedItemsList<Cell> templatedItems, 
-			ElementTemplate template, object context)
-		{
-			var index = templatedItems.GetGlobalIndexOfItem(context);
-			if (index > -1)
-			{
-				return templatedItems[index];
-			}
-
-			return template.CreateContent() as Cell;
 		}
 	}
 }

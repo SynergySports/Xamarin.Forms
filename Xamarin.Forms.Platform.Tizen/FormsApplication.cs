@@ -102,12 +102,12 @@ namespace Xamarin.Forms.Platform.Tizen
 
 			if (null == MainWindow)
 			{
-				throw new NullReferenceException("MainWindow is not prepared. This method should be called in OnCreated().");
+				throw new InvalidOperationException("MainWindow is not prepared. This method should be called in OnCreated().");
 			}
 
 			if (null == application)
 			{
-				throw new ArgumentNullException("application");
+				throw new ArgumentNullException(nameof(application));
 			}
 			_application = application;
 			Application.Current = application;
@@ -130,18 +130,6 @@ namespace Xamarin.Forms.Platform.Tizen
 			{
 				throw new InvalidOperationException("Call Forms.Init (UIApplication) before this");
 			}
-
-			if (_platform != null)
-			{
-				_platform.SetPage(page);
-				return;
-			}
-
-			_platform = Platform.CreatePlatform(BaseLayout);
-			_platform.HasAlpha = MainWindow.Alpha;
-			BaseLayout.SetContent(_platform.GetRootNativeView());
-
-			_platform.RootNativeViewChanged += (s, e) => BaseLayout.SetContent(e.RootNativeView);
 
 			if (_application != null)
 			{
@@ -191,6 +179,11 @@ namespace Xamarin.Forms.Platform.Tizen
 					}
 				}
 			};
+
+			_platform = Platform.CreatePlatform(BaseLayout);
+			_platform.HasAlpha = MainWindow.Alpha;
+			BaseLayout.SetContent(_platform.GetRootNativeView());
+			_platform.RootNativeViewChanged += (s, e) => BaseLayout.SetContent(e.RootNativeView);
 		}
 
 		public void Run()

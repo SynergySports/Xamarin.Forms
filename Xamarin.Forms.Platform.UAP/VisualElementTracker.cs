@@ -23,6 +23,7 @@ namespace Xamarin.Forms.Platform.UWP
 
 		bool _isDisposed;
 		bool _isPanning;
+		bool _isSwiping;
 		bool _isPinching;
 		bool _wasPanGestureStartedSent;
 		bool _wasPinchGestureStartedSent;
@@ -94,6 +95,7 @@ namespace Xamarin.Forms.Platform.UWP
 					{
 						var oldRecognizers = (ObservableCollection<IGestureRecognizer>)view.GestureRecognizers;
 						oldRecognizers.CollectionChanged -= _collectionChangedHandler;
+						((view as IGestureController)?.CompositeGestureRecognizers as ObservableCollection<IGestureRecognizer>).CollectionChanged -= _collectionChangedHandler;
 					}
 				}
 
@@ -109,6 +111,7 @@ namespace Xamarin.Forms.Platform.UWP
 					{
 						var newRecognizers = (ObservableCollection<IGestureRecognizer>)view.GestureRecognizers;
 						newRecognizers.CollectionChanged += _collectionChangedHandler;
+						((view as IGestureController)?.CompositeGestureRecognizers as ObservableCollection<IGestureRecognizer>).CollectionChanged += _collectionChangedHandler;
 					}
 				}
 
@@ -197,7 +200,7 @@ namespace Xamarin.Forms.Platform.UWP
 			{
 				UpdateScaleAndRotation(Element, Container);
 			}
-			else if (e.PropertyName == VisualElement.ScaleProperty.PropertyName)
+			else if (e.PropertyName == VisualElement.ScaleProperty.PropertyName || e.PropertyName == VisualElement.ScaleXProperty.PropertyName || e.PropertyName == VisualElement.ScaleYProperty.PropertyName)
 			{
 				UpdateScaleAndRotation(Element, Container);
 			}
@@ -241,6 +244,19 @@ namespace Xamarin.Forms.Platform.UWP
 			_invalidateArrangeNeeded = false;
 
 			OnUpdated();
+		}
+
+		void HandleSwipe(ManipulationDeltaRoutedEventArgs e, View view)
+		{
+			if (_fingers.Count > 1 || view == null)
+				return;
+
+			_isSwiping = true;
+
+			foreach (SwipeGestureRecognizer recognizer in view.GestureRecognizers.GetGesturesFor<SwipeGestureRecognizer>())
+			{
+				((ISwipeGestureController)recognizer).SendSwipe(view, e.Delta.Translation.X + e.Cumulative.Translation.X, e.Delta.Translation.Y + e.Cumulative.Translation.Y);
+			}
 		}
 
 		void HandlePan(ManipulationDeltaRoutedEventArgs e, View view)
@@ -304,13 +320,30 @@ namespace Xamarin.Forms.Platform.UWP
 			if (view == null)
 				return;
 
+			var tapPosition = e.GetPosition(Control);
+			var children = (view as IGestureController)?.GetChildElements(new Point(tapPosition.X, tapPosition.Y));
+
+			if (children != null)
+				foreach (var recognizer in children.GetChildGesturesFor<TapGestureRecognizer>(g => g.NumberOfTapsRequired == 2))
+				{
+					recognizer.SendTapped(view);
+					e.Handled = true;
+				}
+
+			if (e.Handled)
+				return;
+
 			IEnumerable<TapGestureRecognizer> doubleTapGestures = view.GestureRecognizers.GetGesturesFor<TapGestureRecognizer>(g => g.NumberOfTapsRequired == 2);
 			foreach (TapGestureRecognizer recognizer in doubleTapGestures)
+			{
 				recognizer.SendTapped(view);
+				e.Handled = true;
+			}
 		}
 
 		void OnManipulationCompleted(object sender, ManipulationCompletedRoutedEventArgs e)
 		{
+			SwipeComplete(true);
 			PinchComplete(true);
 			PanComplete(true);
 		}
@@ -320,7 +353,7 @@ namespace Xamarin.Forms.Platform.UWP
 			var view = Element as View;
 			if (view == null)
 				return;
-
+			HandleSwipe(e, view);
 			HandlePinch(e, view);
 			HandlePan(e, view);
 		}
@@ -339,7 +372,7 @@ namespace Xamarin.Forms.Platform.UWP
 			uint id = e.Pointer.PointerId;
 			if (_fingers.Contains(id))
 				_fingers.Remove(id);
-
+			SwipeComplete(false);
 			PinchComplete(false);
 			PanComplete(false);
 		}
@@ -349,7 +382,7 @@ namespace Xamarin.Forms.Platform.UWP
 			uint id = e.Pointer.PointerId;
 			if (_fingers.Contains(id))
 				_fingers.Remove(id);
-
+			SwipeComplete(true);
 			PinchComplete(true);
 			PanComplete(true);
 		}
@@ -366,7 +399,7 @@ namespace Xamarin.Forms.Platform.UWP
 			uint id = e.Pointer.PointerId;
 			if (_fingers.Contains(id))
 				_fingers.Remove(id);
-
+			SwipeComplete(true);
 			PinchComplete(true);
 			PanComplete(true);
 		}
@@ -382,12 +415,42 @@ namespace Xamarin.Forms.Platform.UWP
 			if (view == null)
 				return;
 
+			var tapPosition = e.GetPosition(Control);
+			var children = (view as IGestureController)?.GetChildElements(new Point(tapPosition.X, tapPosition.Y));
+
+			if (children != null)
+				foreach (var recognizer in children.GetChildGesturesFor<TapGestureRecognizer>(g => g.NumberOfTapsRequired == 1))
+				{
+					recognizer.SendTapped(view);
+					e.Handled = true;
+				}
+
+			if (e.Handled)
+				return;
+
 			IEnumerable<TapGestureRecognizer> tapGestures = view.GestureRecognizers.GetGesturesFor<TapGestureRecognizer>(g => g.NumberOfTapsRequired == 1);
-			foreach (TapGestureRecognizer recognizer in tapGestures)
+			foreach (var recognizer in tapGestures)
 			{
 				recognizer.SendTapped(view);
 				e.Handled = true;
 			}
+		}
+
+		void SwipeComplete(bool success)
+		{
+			var view = Element as View;
+			if (view == null || !_isSwiping)
+				return;
+
+			if (success)
+			{
+				foreach (SwipeGestureRecognizer recognizer in view.GestureRecognizers.GetGesturesFor<SwipeGestureRecognizer>())
+				{
+					((ISwipeGestureController)recognizer).DetectSwipe(view, recognizer.Direction);
+				}
+			}
+
+			_isSwiping = false;
 		}
 
 		void OnUpdated()
@@ -464,9 +527,10 @@ namespace Xamarin.Forms.Platform.UWP
 			double rotation = view.Rotation;
 			double translationX = view.TranslationX;
 			double translationY = view.TranslationY;
-			double scale = view.Scale;
+			double scaleX = view.Scale * view.ScaleX;
+			double scaleY = view.Scale * view.ScaleY;
 
-			if (rotationX % 360 == 0 && rotationY % 360 == 0 && rotation % 360 == 0 && translationX == 0 && translationY == 0 && scale == 1)
+			if (rotationX % 360 == 0 && rotationY % 360 == 0 && rotation % 360 == 0 && translationX == 0 && translationY == 0 && scaleX == 1 && scaleY == 1)
 			{
 				frameworkElement.Projection = null;
 			}
@@ -477,14 +541,14 @@ namespace Xamarin.Forms.Platform.UWP
 				// (i.e. their absolute value is 0), a CompositeTransform is instead used to allow for
 				// rotation of the control on a 2D plane, and the other values are set. Otherwise, the
 				// rotation values are set, but the aforementioned functionality will be lost.
-				if (Math.Abs(view.RotationX) == 0 && Math.Abs(view.RotationY) == 0)
+				if (Math.Abs(view.RotationX) != 0 || Math.Abs(view.RotationY) != 0)
 				{
 					frameworkElement.Projection = new PlaneProjection
 					{
 						CenterOfRotationX = anchorX,
 						CenterOfRotationY = anchorY,
-						GlobalOffsetX = scale == 0 ? 0 : translationX / scale,
-						GlobalOffsetY = scale == 0 ? 0 : translationY / scale,
+						GlobalOffsetX = scaleX == 0 ? 0 : translationX / scaleX,
+						GlobalOffsetY = scaleY == 0 ? 0 : translationY / scaleY,
 						RotationX = -rotationX,
 						RotationY = -rotationY,
 						RotationZ = -rotation
@@ -497,8 +561,10 @@ namespace Xamarin.Forms.Platform.UWP
 						CenterX = anchorX,
 						CenterY = anchorY,
 						Rotation = rotation,
-						TranslateX = scale == 0 ? 0 : translationX / scale,
-						TranslateY = scale == 0 ? 0 : translationY / scale
+						ScaleX = scaleX,
+						ScaleY = scaleY,
+						TranslateX = scaleX == 0 ? 0 : translationX / scaleX,
+						TranslateY = scaleY == 0 ? 0 : translationY / scaleY
 					};
 				}
 			}
@@ -508,9 +574,8 @@ namespace Xamarin.Forms.Platform.UWP
 		{
 			double anchorX = view.AnchorX;
 			double anchorY = view.AnchorY;
-			double scale = view.Scale;
 			frameworkElement.RenderTransformOrigin = new Windows.Foundation.Point(anchorX, anchorY);
-			frameworkElement.RenderTransform = new ScaleTransform { ScaleX = scale, ScaleY = scale };
+			frameworkElement.RenderTransform = new ScaleTransform { ScaleX = view.Scale * view.ScaleX, ScaleY = view.Scale * view.ScaleY };
 
 			UpdateRotation(view, frameworkElement);
 		}
@@ -530,7 +595,11 @@ namespace Xamarin.Forms.Platform.UWP
 
 			ClearContainerEventHandlers();
 
-			if (gestures.GetGesturesFor<TapGestureRecognizer>(g => g.NumberOfTapsRequired == 1).Any())
+			var children = (view as IGestureController)?.GetChildElements(Point.Zero);
+			IList<TapGestureRecognizer> childGestures = children?.GetChildGesturesFor<TapGestureRecognizer>().ToList();
+
+			if (gestures.GetGesturesFor<TapGestureRecognizer>(g => g.NumberOfTapsRequired == 1).Any()
+				|| children?.GetChildGesturesFor<TapGestureRecognizer>(g => g.NumberOfTapsRequired == 1).Any() == true)
 			{
 				_container.Tapped += OnTap;
 			}
@@ -542,7 +611,8 @@ namespace Xamarin.Forms.Platform.UWP
 				}
 			}
 
-			if (gestures.GetGesturesFor<TapGestureRecognizer>(g => g.NumberOfTapsRequired == 2).Any())
+			if (gestures.GetGesturesFor<TapGestureRecognizer>(g => g.NumberOfTapsRequired == 2).Any()
+				|| children?.GetChildGesturesFor<TapGestureRecognizer>(g => g.NumberOfTapsRequired == 2).Any() == true)
 			{
 				_container.DoubleTapped += OnDoubleTap;
 			}
@@ -554,9 +624,10 @@ namespace Xamarin.Forms.Platform.UWP
 				}
 			}
 
+			bool hasSwipeGesture = gestures.GetGesturesFor<SwipeGestureRecognizer>().GetEnumerator().MoveNext();
 			bool hasPinchGesture = gestures.GetGesturesFor<PinchGestureRecognizer>().GetEnumerator().MoveNext();
 			bool hasPanGesture = gestures.GetGesturesFor<PanGestureRecognizer>().GetEnumerator().MoveNext();
-			if (!hasPinchGesture && !hasPanGesture)
+			if (!hasSwipeGesture && !hasPinchGesture && !hasPanGesture)
 				return;
 
 			//We can't handle ManipulationMode.Scale and System , so we don't support pinch/pan on a scrollview 
@@ -566,6 +637,8 @@ namespace Xamarin.Forms.Platform.UWP
 					Log.Warning("Gestures", "PinchGestureRecognizer is not supported on a ScrollView in Windows Platforms");
 				if (hasPanGesture)
 					Log.Warning("Gestures", "PanGestureRecognizer is not supported on a ScrollView in Windows Platforms");
+				if (hasSwipeGesture)
+					Log.Warning("Gestures", "SwipeGestureRecognizer is not supported on a ScrollView in Windows Platforms");
 				return;
 			}
 

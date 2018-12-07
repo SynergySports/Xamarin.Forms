@@ -5,6 +5,7 @@ using System.Threading;
 using CoreAnimation;
 using Xamarin.Forms.Internals;
 #if __MOBILE__
+using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 
 namespace Xamarin.Forms.Platform.iOS
 #else
@@ -32,14 +33,12 @@ namespace Xamarin.Forms.Platform.MacOS
 
 		public VisualElementTracker(IVisualElementRenderer renderer)
 		{
-			if (renderer == null)
-				throw new ArgumentNullException("renderer");
+			Renderer = renderer ?? throw new ArgumentNullException("renderer");
 
 			_propertyChangedHandler = HandlePropertyChanged;
 			_sizeChangedEventHandler = HandleSizeChanged;
 			_batchCommittedHandler = HandleRedrawNeeded;
 
-			Renderer = renderer;
 			renderer.ElementChanged += OnRendererElementChanged;
 			SetElement(null, renderer.Element);
 		}
@@ -79,7 +78,7 @@ namespace Xamarin.Forms.Platform.MacOS
 		{
 			if (e.PropertyName == VisualElement.XProperty.PropertyName || e.PropertyName == VisualElement.YProperty.PropertyName || e.PropertyName == VisualElement.WidthProperty.PropertyName ||
 				e.PropertyName == VisualElement.HeightProperty.PropertyName || e.PropertyName == VisualElement.AnchorXProperty.PropertyName || e.PropertyName == VisualElement.AnchorYProperty.PropertyName ||
-				e.PropertyName == VisualElement.TranslationXProperty.PropertyName || e.PropertyName == VisualElement.TranslationYProperty.PropertyName || e.PropertyName == VisualElement.ScaleProperty.PropertyName ||
+				e.PropertyName == VisualElement.TranslationXProperty.PropertyName || e.PropertyName == VisualElement.TranslationYProperty.PropertyName || e.PropertyName == VisualElement.ScaleProperty.PropertyName || e.PropertyName == VisualElement.ScaleXProperty.PropertyName || e.PropertyName == VisualElement.ScaleYProperty.PropertyName ||
 				e.PropertyName == VisualElement.RotationProperty.PropertyName || e.PropertyName == VisualElement.RotationXProperty.PropertyName || e.PropertyName == VisualElement.RotationYProperty.PropertyName ||
 				e.PropertyName == VisualElement.IsVisibleProperty.PropertyName || e.PropertyName == VisualElement.IsEnabledProperty.PropertyName ||
 				e.PropertyName == VisualElement.InputTransparentProperty.PropertyName || e.PropertyName == VisualElement.OpacityProperty.PropertyName || 
@@ -143,9 +142,9 @@ namespace Xamarin.Forms.Platform.MacOS
 #if !__MOBILE__
 			var viewParent = view.RealParent as VisualElement;
 			var parentBoundsChanged = _lastParentBounds != (viewParent == null ? Rectangle.Zero : viewParent.Bounds);
+#else
+			var thread = !boundsChanged && !caLayer.Frame.IsEmpty && Application.Current?.OnThisPlatform()?.GetHandleControlUpdatesOnMainThread() == false;
 #endif
-			var thread = !boundsChanged && !caLayer.Frame.IsEmpty;
-
 			var anchorX = (float)view.AnchorX;
 			var anchorY = (float)view.AnchorY;
 			var translationX = (float)view.TranslationX;
@@ -154,6 +153,8 @@ namespace Xamarin.Forms.Platform.MacOS
 			var rotationY = (float)view.RotationY;
 			var rotation = (float)view.Rotation;
 			var scale = (float)view.Scale;
+			var scaleX = (float)view.ScaleX * scale;
+			var scaleY = (float)view.ScaleY * scale;
 			var width = (float)view.Width;
 			var height = (float)view.Height;
 			var x = (float)view.X + (float)CompressedLayout.GetHeadlessOffset(view).X;
@@ -163,7 +164,7 @@ namespace Xamarin.Forms.Platform.MacOS
 
 			var updateTarget = Interlocked.Increment(ref _updateCount);
 
-			Action update = () =>
+			void update()
 			{
 				if (updateTarget != _updateCount)
 					return;
@@ -246,8 +247,8 @@ namespace Xamarin.Forms.Platform.MacOS
 				if (Math.Abs(translationX) > epsilon || Math.Abs(translationY) > epsilon)
 					transform = transform.Translate(translationX, translationY, 0);
 
-				if (Math.Abs(scale - 1) > epsilon)
-					transform = transform.Scale(scale);
+				if (Math.Abs(scaleX - 1) > epsilon || Math.Abs(scaleY - 1) > epsilon)
+					transform = transform.Scale(scaleX, scaleY, scale);
 
 				// not just an optimization, iOS will not "pixel align" a view which has m34 set
 				if (Math.Abs(rotationY % 180) > epsilon || Math.Abs(rotationX % 180) > epsilon)
@@ -260,7 +261,7 @@ namespace Xamarin.Forms.Platform.MacOS
 
 				transform = transform.Rotate(rotation * (float)Math.PI / 180.0f, 0.0f, 0.0f, 1.0f);
 				caLayer.Transform = transform;
-			};
+			}
 
 #if __MOBILE__
 			if (thread)
@@ -300,8 +301,7 @@ namespace Xamarin.Forms.Platform.MacOS
 
 		void UpdateNativeControl()
 		{
-			var reference = Guid.NewGuid().ToString();
-			Performance.Start(reference);
+			Performance.Start(out string reference);
 
 			if (_disposed)
 				return;

@@ -19,6 +19,9 @@ using Xamarin.Forms.Platform.Android;
 //[assembly: AssemblyDelaySign(false)]
 //[assembly: AssemblyKeyFile("")]
 
+
+// These renderers are now registered via the RenderWithAttribute in the Android Forwarders project.
+// Note that AppCompat and FastRenderers are also registered conditionally in FormsAppCompatActivity.LoadApplication
 #if ROOT_RENDERERS
 [assembly: ExportRenderer (typeof (BoxView), typeof (BoxRenderer))]
 [assembly: ExportRenderer (typeof (Entry), typeof (EntryRenderer))]
@@ -26,6 +29,7 @@ using Xamarin.Forms.Platform.Android;
 [assembly: ExportRenderer (typeof (Label), typeof (LabelRenderer))]
 [assembly: ExportRenderer (typeof (Image), typeof (ImageRenderer))]
 [assembly: ExportRenderer (typeof (Button), typeof (ButtonRenderer))]
+[assembly: ExportRenderer (typeof (ImageButton), typeof (ImageButtonRenderer))]
 [assembly: ExportRenderer (typeof (TableView), typeof (TableViewRenderer))]
 [assembly: ExportRenderer (typeof (ListView), typeof (ListViewRenderer))]
 [assembly: ExportRenderer (typeof (Slider), typeof (SliderRenderer))]
@@ -63,3 +67,5 @@ using Xamarin.Forms.Platform.Android;
 [assembly: Xamarin.Forms.Dependency(typeof(Deserializer))]
 [assembly: Xamarin.Forms.Dependency(typeof(ResourcesProvider))]
 [assembly: Preserve]
+[assembly: AssemblyVersion("2.0.0.0")]
+[assembly: AssemblyFileVersion("2.0.0.0")]

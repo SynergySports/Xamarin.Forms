@@ -1,5 +1,3 @@
-using System;
-using System.ComponentModel;
 using Android.Content;
 using Android.Content.Res;
 using Android.Graphics;
@@ -7,12 +5,17 @@ using Android.Text;
 using Android.Util;
 using Android.Views;
 using Android.Widget;
+using System;
+using System.ComponentModel;
+using Xamarin.Forms.PlatformConfiguration.TizenSpecific;
 
 namespace Xamarin.Forms.Platform.Android
 {
 	public class LabelRenderer : ViewRenderer<Label, TextView>
 	{
 		ColorStateList _labelTextColorDefault;
+		float _lineSpacingExtraDefault;
+		float _lineSpacingMultiplierDefault;
 		int _lastConstraintHeight;
 		int _lastConstraintWidth;
 
@@ -25,6 +28,8 @@ namespace Xamarin.Forms.Platform.Android
 		bool _wasFormatted;
 
 		readonly MotionEventHelper _motionEventHelper = new MotionEventHelper();
+
+		SpannableString _spannableString;
 
 		public LabelRenderer(Context context) : base(context)
 		{
@@ -76,6 +81,12 @@ namespace Xamarin.Forms.Platform.Android
 			return result;
 		}
 
+		protected override void OnLayout(bool changed, int l, int t, int r, int b)
+		{
+			base.OnLayout(changed, l, t, r, b);
+			Control.RecalculateSpanPositions(Element, _spannableString, new SizeRequest(new Size(r - l, b - t)));
+		}
+
 		protected override TextView CreateNativeControl()
 		{
 			return new FormsTextView(Context);
@@ -88,6 +99,8 @@ namespace Xamarin.Forms.Platform.Android
 			{
 				_view = (FormsTextView)CreateNativeControl();
 				_labelTextColorDefault = _view.TextColors;
+				_lineSpacingMultiplierDefault = _view.LineSpacingMultiplier;
+				_lineSpacingExtraDefault = _view.LineSpacingExtra;
 				SetNativeControl(_view);
 			}
 
@@ -95,7 +108,9 @@ namespace Xamarin.Forms.Platform.Android
 			{
 				UpdateText();
 				UpdateLineBreakMode();
+				UpdateLineHeight();
 				UpdateGravity();
+				UpdateMaxLines();
 			}
 			else
 			{
@@ -105,8 +120,10 @@ namespace Xamarin.Forms.Platform.Android
 					UpdateLineBreakMode();
 				if (e.OldElement.HorizontalTextAlignment != e.NewElement.HorizontalTextAlignment || e.OldElement.VerticalTextAlignment != e.NewElement.VerticalTextAlignment)
 					UpdateGravity();
+				if (e.OldElement.MaxLines != e.NewElement.MaxLines)
+					UpdateMaxLines();
 			}
-
+			UpdateTextDecorations();
 			_motionEventHelper.UpdateElement(e.NewElement);
 		}
 
@@ -122,8 +139,14 @@ namespace Xamarin.Forms.Platform.Android
 				UpdateText();
 			else if (e.PropertyName == Label.LineBreakModeProperty.PropertyName)
 				UpdateLineBreakMode();
+			else if (e.PropertyName == Label.TextDecorationsProperty.PropertyName)
+				UpdateTextDecorations();
 			else if (e.PropertyName == Label.TextProperty.PropertyName || e.PropertyName == Label.FormattedTextProperty.PropertyName)
 				UpdateText();
+			else if (e.PropertyName == Label.LineHeightProperty.PropertyName)
+				UpdateLineHeight();
+			else if (e.PropertyName == Label.MaxLinesProperty.PropertyName)
+				UpdateMaxLines();
 		}
 
 		void UpdateColor()
@@ -160,6 +183,24 @@ namespace Xamarin.Forms.Platform.Android
 			}
 		}
 
+		void UpdateTextDecorations()
+		{
+			if (!Element.IsSet(Label.TextDecorationsProperty))
+				return;
+
+			var textDecorations = Element.TextDecorations;
+
+			if ((textDecorations & TextDecorations.Strikethrough) == 0)
+				_view.PaintFlags &= ~PaintFlags.StrikeThruText;
+			else
+				_view.PaintFlags |= PaintFlags.StrikeThruText;
+
+			if ((textDecorations & TextDecorations.Underline) == 0)
+				_view.PaintFlags &= ~PaintFlags.UnderlineText;
+			else
+				_view.PaintFlags |= PaintFlags.UnderlineText;
+		}
+
 		void UpdateGravity()
 		{
 			Label label = Element;
@@ -171,8 +212,22 @@ namespace Xamarin.Forms.Platform.Android
 
 		void UpdateLineBreakMode()
 		{
-			_view.SetLineBreakMode(Element.LineBreakMode);
+			_view.SetLineBreakMode(Element);
 			_lastSizeRequest = null;
+		}
+
+		void UpdateLineHeight()
+		{
+			_lastSizeRequest = null;
+			if (Element.LineHeight == -1)
+				_view.SetLineSpacing(_lineSpacingExtraDefault, _lineSpacingMultiplierDefault);
+			else if (Element.LineHeight >= 0)
+				_view.SetLineSpacing(0, (float)Element.LineHeight);
+		}
+
+		void UpdateMaxLines()
+		{
+			Control.SetMaxLines(Element);	
 		}
 
 		void UpdateText()
@@ -181,7 +236,7 @@ namespace Xamarin.Forms.Platform.Android
 			{
 				FormattedString formattedText = Element.FormattedText ?? Element.Text;
 #pragma warning disable 618 // We will need to update this when .Font goes away
-				_view.TextFormatted = formattedText.ToAttributed(Element.Font, Element.TextColor, _view);
+				_view.TextFormatted = _spannableString = formattedText.ToAttributed(Element.Font, Element.TextColor, _view);
 #pragma warning restore 618
 				_wasFormatted = true;
 			}
