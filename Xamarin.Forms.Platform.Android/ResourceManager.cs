@@ -9,6 +9,7 @@ using Android.Graphics.Drawables;
 using Android.Support.V4.Content;
 using Path = System.IO.Path;
 using Xamarin.Forms.Internals;
+using AndroidAppCompat = Android.Support.V7.Content.Res.AppCompatResources;
 
 namespace Xamarin.Forms.Platform.Android
 {
@@ -18,11 +19,24 @@ namespace Xamarin.Forms.Platform.Android
 
 		public static Type ResourceClass { get; set; }
 
+		public static Type StyleClass { get; set; }
+
+		internal static async Task<Drawable> GetFormsDrawable(this Context context, ImageSource imageSource)
+		{
+			if (imageSource is FileImageSource fileSource)
+				return context.GetFormsDrawable(fileSource);
+
+			var handler = Registrar.Registered.GetHandlerForObject<IImageSourceHandler>(imageSource);
+			var icon = await handler.LoadImageAsync(imageSource, context);
+			var drawable = new BitmapDrawable(context.Resources, icon);
+			return drawable;
+		}
+
 		internal static Drawable GetFormsDrawable(this Context context, FileImageSource fileImageSource)
 		{
 			var file = fileImageSource.File;
 			Drawable drawable = context.GetDrawable(fileImageSource);
-			if(drawable == null)
+			if (drawable == null)
 			{
 				var bitmap = GetBitmap(context.Resources, file) ?? BitmapFactory.DecodeFile(file);
 				if (bitmap == null)
@@ -57,7 +71,7 @@ namespace Xamarin.Forms.Platform.Android
 			return BitmapFactory.DecodeResourceAsync(resource, IdFromTitle(name, DrawableClass));
 		}
 
-		[Obsolete("GetDrawable(this Resources, string) is obsolete as of version 2.5. " 
+		[Obsolete("GetDrawable(this Resources, string) is obsolete as of version 2.5. "
 			+ "Please use GetDrawable(this Context, string) instead.")]
 		public static Drawable GetDrawable(this Resources resource, string name)
 		{
@@ -68,7 +82,7 @@ namespace Xamarin.Forms.Platform.Android
 				return null;
 			}
 
-			return ContextCompat.GetDrawable(Forms.Context, id);
+			return AndroidAppCompat.GetDrawable(Forms.Context, id);
 		}
 
 		public static Drawable GetDrawable(this Context context, string name)
@@ -80,7 +94,7 @@ namespace Xamarin.Forms.Platform.Android
 				return null;
 			}
 
-			return ContextCompat.GetDrawable(context, id);
+			return AndroidAppCompat.GetDrawable(context, id);
 		}
 
 		public static int GetDrawableByName(string name)
@@ -93,10 +107,17 @@ namespace Xamarin.Forms.Platform.Android
 			return IdFromTitle(name, ResourceClass);
 		}
 
+		public static int GetStyleByName(string name)
+		{
+			return IdFromTitle(name, StyleClass);
+		}
+
 		public static void Init(Assembly masterAssembly)
 		{
 			DrawableClass = masterAssembly.GetTypes().FirstOrDefault(x => x.Name == "Drawable" || x.Name == "Resource_Drawable");
 			ResourceClass = masterAssembly.GetTypes().FirstOrDefault(x => x.Name == "Id" || x.Name == "Resource_Id");
+			StyleClass = masterAssembly.GetTypes().FirstOrDefault(x => x.Name == "Style" || x.Name == "Resource_Style");
+			
 		}
 
 		internal static int IdFromTitle(string title, Type type)
@@ -108,10 +129,34 @@ namespace Xamarin.Forms.Platform.Android
 
 		static int GetId(Type type, string memberName)
 		{
-			object value = type.GetFields().FirstOrDefault(p => p.Name == memberName)?.GetValue(type)
-				?? type.GetProperties().FirstOrDefault(p => p.Name == memberName)?.GetValue(type);
-			if (value is int)
-				return (int)value;
+			object value = null;
+			var fields = type.GetFields();
+			for (int i = 0; i < fields.Length; i++)
+			{
+				var field = fields[i];
+				if (field.Name == memberName)
+				{
+					value = field.GetValue(type);
+					break;
+				}
+			}
+
+			if (value == null)
+			{
+				var properties = type.GetProperties();
+				for (int i = 0; i < properties.Length; i++)
+				{
+					var prop = properties[i];
+					if (prop.Name == memberName)
+					{
+						value = prop.GetValue(type);
+						break;
+					}
+				}
+			}
+
+			if (value is int result)
+				return result;
 			return 0;
 		}
 	}

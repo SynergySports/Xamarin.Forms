@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Threading.Tasks;
 using Xamarin.Forms.Internals;
 using Xamarin.Forms.Platform;
+using System.Diagnostics;
 
 namespace Xamarin.Forms
 {
@@ -22,6 +23,11 @@ namespace Xamarin.Forms
 		Page _mainPage;
 
 		static SemaphoreSlim SaveSemaphore = new SemaphoreSlim(1, 1);
+
+		[Obsolete("Assign the LogWarningsListener")]
+		public static bool LogWarningsToApplicationOutput { get; set; }
+
+		bool MainPageSet { get; set; }
 
 		public Application()
 		{
@@ -88,6 +94,7 @@ namespace Xamarin.Forms
 				}
 
 				_mainPage = value;
+				MainPageSet = true;
 
 				if (_mainPage != null)
 				{
@@ -173,7 +180,6 @@ namespace Xamarin.Forms
 		public event EventHandler<Page> PageAppearing;
 
 		public event EventHandler<Page> PageDisappearing;
-
 
 		async void SaveProperties()
 		{

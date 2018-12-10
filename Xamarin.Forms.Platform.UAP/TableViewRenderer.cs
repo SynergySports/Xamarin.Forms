@@ -1,12 +1,14 @@
 ﻿using System;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Data;
+using WItemsControl = Windows.UI.Xaml.Controls.ItemsControl;
 
 namespace Xamarin.Forms.Platform.UWP
 {
 	public class TableViewRenderer : ViewRenderer<TableView, Windows.UI.Xaml.Controls.ListView>
 	{
 		bool _ignoreSelectionEvent;
+		bool _disposed;
 
 		public override SizeRequest GetDesiredSize(double widthConstraint, double heightConstraint)
 		{
@@ -36,7 +38,7 @@ namespace Xamarin.Forms.Platform.UWP
 					});
 
 					// You can't set ItemsSource directly to a CollectionViewSource, it crashes.
-					Control.SetBinding(ItemsControl.ItemsSourceProperty, "");
+					Control.SetBinding(WItemsControl.ItemsSourceProperty, "");
 					Control.SelectionChanged += OnSelectionChanged;
 				}
 
@@ -45,6 +47,19 @@ namespace Xamarin.Forms.Platform.UWP
 			}
 
 			base.OnElementChanged(e);
+		}
+
+		protected override void Dispose(bool disposing)
+		{
+			if(disposing && !_disposed)
+			{
+				_disposed = true;
+				if(Control != null)
+				{
+					Control.SelectionChanged -= OnSelectionChanged;				
+				}
+			}
+			base.Dispose(disposing);
 		}
 
 		void OnModelChanged(object sender, EventArgs e)
@@ -64,8 +79,7 @@ namespace Xamarin.Forms.Platform.UWP
 			{
 				foreach (object item in e.AddedItems)
 				{
-					var cell = item as Cell;
-					if (cell != null)
+					if (item is Cell cell)
 					{
 						if (cell.IsEnabled)
 							Element.Model.RowSelected(cell);
@@ -73,6 +87,9 @@ namespace Xamarin.Forms.Platform.UWP
 					}
 				}
 			}
+
+			if (Control == null)
+				return;
 
 			Control.SelectedItem = null;
 		}

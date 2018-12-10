@@ -260,7 +260,7 @@ namespace Xamarin.Forms
 			{
 				NSUrl url;
 
-				if (uri.Scheme == "tel")
+				if (uri.Scheme == "tel" || uri.Scheme == "mailto")
 					url = new NSUrl(uri.AbsoluteUri);
 				else
 					url = NSUrl.FromString(uri.OriginalString) ?? new NSUrl(uri.Scheme, uri.Host, uri.PathAndQuery);
@@ -349,6 +349,15 @@ namespace Xamarin.Forms
 				Log.Warning(nameof(IOSPlatformServices), "Platform doesn't implement QuitApp");
 #else
 				NSApplication.SharedApplication.Terminate(new NSObject());
+#endif
+			}
+
+			public SizeRequest GetNativeSize(VisualElement view, double widthConstraint, double heightConstraint)
+			{
+#if __MOBILE__
+				return Platform.iOS.Platform.GetNativeSize(view, widthConstraint, heightConstraint);
+#else
+				return Platform.MacOS.Platform.GetNativeSize(view, widthConstraint, heightConstraint);
 #endif
 			}
 		}

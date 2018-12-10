@@ -55,7 +55,7 @@
 				</x:Array>
 			</ListView.ItemsSource>
 		</ListView>
-		<Label x:Name="label12" TextColor="Red" />
+		<Label x:Name="label12" TextColor="red" />
 		<Label x:Name="label13">
 			<Label.TextColor>
 				<Color>Pink</Color>
@@ -83,7 +83,7 @@
 				<d:IgnorableElement />
 			</ContentView.Content>
 		</ContentView>
-		<local:MockViewWithValues x:Name="mockView0" UShort="32" ADecimal="42" />
+		<local:MockViewWithValues x:Name="mockView0" AChar="!" AByte="2" ASByte="-12" AShort="-22" UShort="32" ADecimal="42" />
 		<local:ViewWithEnums x:Name="enums" IntEnum="Foo" ByteEnum="Bar" />
 		<local:MockViewWithValues x:Name="implicit0">
 			<local:MockViewWithValues.BPBar>

@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using Android.Content;
 using Android.Util;
 using Android.Views.InputMethods;
+using AApplicationInfoFlags = Android.Content.PM.ApplicationInfoFlags;
 
 namespace Xamarin.Forms.Platform.Android
 {
@@ -22,12 +23,26 @@ namespace Xamarin.Forms.Platform.Android
 			return pixels / s_displayDensity;
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static Size FromPixels(this Context context, double width, double height)
+		{
+			return new Size(context.FromPixels(width), context.FromPixels(height));
+		}
+
 		public static void HideKeyboard(this Context self, global::Android.Views.View view)
 		{
 			var service = (InputMethodManager)self.GetSystemService(Context.InputMethodService);
 			// Can happen in the context of the Android Designer
 			if (service != null)
 				service.HideSoftInputFromWindow(view.WindowToken, 0);
+		}
+
+		public static void ShowKeyboard(this Context self, global::Android.Views.View view)
+		{
+			var service = (InputMethodManager)self.GetSystemService(Context.InputMethodService);
+			// Can happen in the context of the Android Designer
+			if (service != null)
+				service.ShowSoftInput(view, ShowFlags.Implicit);
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -37,6 +52,12 @@ namespace Xamarin.Forms.Platform.Android
 
 			return (float)Math.Round(dp * s_displayDensity);
 		}
+
+		public static bool HasRtlSupport(this Context self) =>
+			(self.ApplicationInfo.Flags & AApplicationInfoFlags.SupportsRtl) == AApplicationInfoFlags.SupportsRtl;
+
+		public static int TargetSdkVersion(this Context self) =>
+			(int)self.ApplicationInfo.TargetSdkVersion;
 
 		internal static double GetThemeAttributeDp(this Context self, int resource)
 		{

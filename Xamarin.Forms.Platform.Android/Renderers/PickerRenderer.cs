@@ -1,5 +1,4 @@
 using Android.App;
-using Android.Content.Res;
 using Android.Util;
 using Android.Views;
 using Android.Widget;
@@ -7,16 +6,12 @@ using System;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
-using ADatePicker = Android.Widget.DatePicker;
-using ATimePicker = Android.Widget.TimePicker;
-using Object = Java.Lang.Object;
 using Orientation = Android.Widget.Orientation;
 using Android.Content;
-using Xamarin.Forms.PlatformConfiguration.AndroidSpecific;
 
 namespace Xamarin.Forms.Platform.Android
 {
-	public class PickerRenderer : ViewRenderer<Picker, EditText>
+	public class PickerRenderer : ViewRenderer<Picker, EditText>, IPickerRenderer
 	{
 		AlertDialog _dialog;
 		bool _isDisposed;
@@ -48,7 +43,7 @@ namespace Xamarin.Forms.Platform.Android
 
 		protected override EditText CreateNativeControl()
 		{
-			return new EditText(Context) { Focusable = false, Clickable = true, Tag = this };
+			return new PickerEditText(Context, this);
 		}
 
 		protected override void OnElementChanged(ElementChangedEventArgs<Picker> e)
@@ -62,14 +57,13 @@ namespace Xamarin.Forms.Platform.Android
 				if (Control == null)
 				{
 					var textField = CreateNativeControl();
-					textField.SetOnClickListener(PickerListener.Instance);
 
 					var useLegacyColorManagement = e.NewElement.UseLegacyColorManagement();
 					_textColorSwitcher = new TextColorSwitcher(textField.TextColors, useLegacyColorManagement);
 
 					SetNativeControl(textField);
 				}
-				
+
 				UpdateFont();
 				UpdatePicker();
 				UpdateTextColor();
@@ -97,17 +91,16 @@ namespace Xamarin.Forms.Platform.Android
 			base.OnFocusChangeRequested(sender, e);
 
 			if (e.Focus)
-				OnClick();
+				CallOnClick();
 			else if (_dialog != null)
 			{
 				_dialog.Hide();
 				ElementController.SetValueFromRenderer(VisualElement.IsFocusedPropertyKey, false);
-				Control.ClearFocus();
 				_dialog = null;
 			}
 		}
 
-		void OnClick()
+		void IPickerRenderer.OnClick()
 		{
 			Picker model = Element;
 
@@ -133,9 +126,6 @@ namespace Xamarin.Forms.Platform.Android
 			builder.SetNegativeButton(global::Android.Resource.String.Cancel, (s, a) =>
 			{
 				ElementController.SetValueFromRenderer(VisualElement.IsFocusedPropertyKey, false);
-				// It is possible for the Content of the Page to be changed when Focus is changed.
-				// In this case, we'll lose our Control.
-				Control?.ClearFocus();
 				_dialog = null;
 			});
 			builder.SetPositiveButton(global::Android.Resource.String.Ok, (s, a) =>
@@ -148,9 +138,6 @@ namespace Xamarin.Forms.Platform.Android
 					if (model.Items.Count > 0 && Element.SelectedIndex >= 0)
 						Control.Text = model.Items[Element.SelectedIndex];
 					ElementController.SetValueFromRenderer(VisualElement.IsFocusedPropertyKey, false);
-					// It is also possible for the Content of the Page to be changed when Focus is changed.
-					// In this case, we'll lose our Control.
-					Control?.ClearFocus();
 				}
 				_dialog = null;
 			});
@@ -180,7 +167,7 @@ namespace Xamarin.Forms.Platform.Android
 
 			string oldText = Control.Text;
 
-			if (Element.SelectedIndex == -1 || Element.Items == null)
+			if (Element.SelectedIndex == -1 || Element.Items == null || Element.SelectedIndex >= Element.Items.Count)
 				Control.Text = null;
 			else
 				Control.Text = Element.Items[Element.SelectedIndex];
@@ -192,20 +179,6 @@ namespace Xamarin.Forms.Platform.Android
 		void UpdateTextColor()
 		{
 			_textColorSwitcher?.UpdateTextColor(Control, Element.TextColor);
-		}
-
-		class PickerListener : Object, IOnClickListener
-		{
-			public static readonly PickerListener Instance = new PickerListener();
-
-			public void OnClick(global::Android.Views.View v)
-			{
-				var renderer = v.Tag as PickerRenderer;
-				if (renderer == null)
-					return;
-
-				renderer.OnClick();
-			}
 		}
 	}
 }

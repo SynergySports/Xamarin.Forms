@@ -17,6 +17,8 @@ namespace Xamarin.Forms.Platform.UWP
 		Brush _backgroundColorFocusedDefaultBrush;
 		Brush _textDefaultBrush;
 		Brush _defaultTextColorFocusBrush;
+		Brush _defaultPlaceholderColorFocusBrush;
+		Brush _placeholderDefaultBrush;
 
 		IEditorController ElementController => Element;
 
@@ -58,6 +60,8 @@ namespace Xamarin.Forms.Platform.UWP
 				UpdateFlowDirection();
 				UpdateMaxLength();
 				UpdateDetectReadingOrderFromContent();
+				UpdatePlaceholderText();
+				UpdatePlaceholderColor();
 			}
 
 			base.OnElementChanged(e);
@@ -90,6 +94,10 @@ namespace Xamarin.Forms.Platform.UWP
 			{
 				UpdateInputScope();
 			}
+			else if (e.PropertyName == Editor.IsTextPredictionEnabledProperty.PropertyName)
+			{
+				UpdateInputScope();
+			}
 			else if (e.PropertyName == Editor.FontAttributesProperty.PropertyName)
 			{
 				UpdateFont();
@@ -115,11 +123,31 @@ namespace Xamarin.Forms.Platform.UWP
 				UpdateMaxLength();
 			else if (e.PropertyName == Specifics.DetectReadingOrderFromContentProperty.PropertyName)
 				UpdateDetectReadingOrderFromContent();
+			else if (e.PropertyName == Editor.PlaceholderProperty.PropertyName)
+				UpdatePlaceholderText();
+			else if (e.PropertyName == Editor.PlaceholderColorProperty.PropertyName)
+				UpdatePlaceholderColor();
 		}
 
 		void OnLostFocus(object sender, RoutedEventArgs e)
 		{
 			ElementController.SendCompleted();
+		}
+
+		void UpdatePlaceholderText()
+		{
+			Control.PlaceholderText = Element.Placeholder ?? "";
+		}
+
+		void UpdatePlaceholderColor()
+		{
+			Color placeholderColor = Element.PlaceholderColor;
+
+			BrushHelpers.UpdateColor(placeholderColor, ref _placeholderDefaultBrush,
+				() => Control.PlaceholderForegroundBrush, brush => Control.PlaceholderForegroundBrush = brush);
+
+			BrushHelpers.UpdateColor(placeholderColor, ref _defaultPlaceholderColorFocusBrush,
+				() => Control.PlaceholderForegroundFocusBrush, brush => Control.PlaceholderForegroundFocusBrush = brush);
 		}
 
 		protected override void UpdateBackgroundColor()
@@ -258,7 +286,10 @@ namespace Xamarin.Forms.Platform.UWP
 			}
 			else
 			{
-				Control.ClearValue(TextBox.IsTextPredictionEnabledProperty);
+				if (editor.IsSet(Editor.IsTextPredictionEnabledProperty))
+					Control.IsTextPredictionEnabled = editor.IsTextPredictionEnabled;
+				else
+					Control.ClearValue(TextBox.IsTextPredictionEnabledProperty);
 				if (editor.IsSet(InputView.IsSpellCheckEnabledProperty))
 					Control.IsSpellCheckEnabled = editor.IsSpellCheckEnabled;
 				else

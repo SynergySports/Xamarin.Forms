@@ -102,7 +102,7 @@ namespace Xamarin.Forms
 
 		void IPaddingElement.OnPaddingPropertyChanged(Thickness oldValue, Thickness newValue)
 		{
-			UpdateChildrenLayout();
+			InvalidateLayout();
 		}
 
 		internal ObservableCollection<Element> InternalChildren { get; } = new ObservableCollection<Element>();
@@ -137,7 +137,7 @@ namespace Xamarin.Forms
 		{
 			var parent = child.Parent as IFlowDirectionController;
 			bool isRightToLeft = false;
-			if (parent != null && (isRightToLeft = parent.EffectiveFlowDirection.IsRightToLeft()))
+			if (parent != null && (isRightToLeft = parent.ApplyEffectiveFlowDirectionToChildContainer && parent.EffectiveFlowDirection.IsRightToLeft()))
 				region = new Rectangle(parent.Width - region.Right, region.Y, region.Width, region.Height);
 
 			var view = child as View;
@@ -280,7 +280,7 @@ namespace Xamarin.Forms
 		{
 			var parent = child.Parent as IFlowDirectionController;
 			bool isRightToLeft = false;
-			if (parent != null && (isRightToLeft = parent.EffectiveFlowDirection.IsRightToLeft()))
+			if (parent != null && (isRightToLeft = parent.ApplyEffectiveFlowDirectionToChildContainer && parent.EffectiveFlowDirection.IsRightToLeft()))
 				region = new Rectangle(parent.Width - region.Right, region.Y, region.Width, region.Height);
 
 			if (region.Size != childSizeRequest.Request)
@@ -358,6 +358,12 @@ namespace Xamarin.Forms
 			if (!s_relayoutInProgress)
 			{
 				s_relayoutInProgress = true;
+
+				// Rather than recomputing the layout for each change as it happens, we accumulate them in 
+				// s_resolutionList and schedule a single layout update operation to handle them all at once.
+				// This avoids a lot of unnecessary layout operations if something is triggering many property
+				// changes at once (e.g., a BindingContext change)
+
 				Device.BeginInvokeOnMainThread(() =>
 				{
 					// if thread safety mattered we would need to lock this and compareexchange above
@@ -410,8 +416,9 @@ namespace Xamarin.Forms
 
 			if (e.OldItems != null)
 			{
-				foreach (object item in e.OldItems)
+				for (int i = 0; i < e.OldItems.Count; i++)
 				{
+					object item = e.OldItems[i];
 					var v = item as View;
 					if (v == null)
 						continue;
@@ -422,8 +429,9 @@ namespace Xamarin.Forms
 
 			if (e.NewItems != null)
 			{
-				foreach (object item in e.NewItems)
+				for (int i = 0; i < e.NewItems.Count; i++)
 				{
+					object item = e.NewItems[i];
 					var v = item as View;
 					if (v == null)
 						continue;

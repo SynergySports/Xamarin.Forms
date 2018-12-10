@@ -3,52 +3,55 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Xamarin.Forms.Controls.GalleryPages;
+using Xamarin.Forms.Controls.GalleryPages.CollectionViewGalleries;
 using Xamarin.Forms.CustomAttributes;
 using Xamarin.Forms.Internals;
 using Xamarin.Forms.PlatformConfiguration;
+using Xamarin.Forms.PlatformConfiguration.AndroidSpecific;
 using Xamarin.Forms.PlatformConfiguration.iOSSpecific;
 using Xamarin.Forms.Controls.GalleryPages.VisualStateManagerGalleries;
-
 namespace Xamarin.Forms.Controls
 {
+	[Preserve(AllMembers = true)]
 	public static class Messages
 	{
 		public const string ChangeRoot = "com.xamarin.ChangeRoot";
 	}
-
+	[Preserve(AllMembers = true)]
 	internal class CoreCarouselPage : CarouselPage
 	{
-		public CoreCarouselPage ()
+		public CoreCarouselPage()
 		{
 			AutomationId = "CarouselPageRoot";
-			Children.Add (new CoreRootPage (this, NavigationBehavior.PushModalAsync) { Title = "Page 1" });
-			Children.Add (new CoreRootPage (this, NavigationBehavior.PushModalAsync) { Title = "Page 2" });
+			Children.Add(new CoreRootPage(this, NavigationBehavior.PushModalAsync) { Title = "Page 1" });
+			Children.Add(new CoreRootPage(this, NavigationBehavior.PushModalAsync) { Title = "Page 2" });
 		}
 	}
-
+	[Preserve(AllMembers = true)]
 	internal class CoreContentPage : ContentPage
 	{
-		public CoreContentPage ()
+		public CoreContentPage()
 		{
 			On<iOS>().SetUseSafeArea(true);
 			AutomationId = "ContentPageRoot";
-			Content = new StackLayout { Children = { new CoreRootView (), new CorePageView (this, NavigationBehavior.PushModalAsync) } };
+			Content = new StackLayout { Children = { new CoreRootView(), new CorePageView(this, NavigationBehavior.PushModalAsync) } };
 		}
 	}
-
+	[Preserve(AllMembers = true)]
 	internal class CoreMasterDetailPage : MasterDetailPage
 	{
-		public CoreMasterDetailPage ()
+		public CoreMasterDetailPage()
 		{
 			AutomationId = "MasterDetailPageRoot";
 
-			var toCrashButton = new Button {Text = "Crash Me"};
+			var toCrashButton = new Button { Text = "Crash Me" };
 
-			var masterPage = new ContentPage {Title = "Menu", Icon = "bank.png", Content = toCrashButton};
-			var detailPage = new CoreRootPage (this, NavigationBehavior.PushModalAsync) { Title = "DetailPage" };
+			var masterPage = new ContentPage { Title = "Menu", Icon = "bank.png", Content = toCrashButton };
+			var detailPage = new CoreRootPage(this, NavigationBehavior.PushModalAsync) { Title = "DetailPage" };
 
 			bool toggle = false;
-			toCrashButton.Clicked += (sender, args) => {
+			toCrashButton.Clicked += (sender, args) =>
+			{
 				if (toggle)
 					Detail = new ContentPage { BackgroundColor = Color.Green, };
 				else
@@ -61,17 +64,18 @@ namespace Xamarin.Forms.Controls
 			Detail = detailPage;
 		}
 	}
-
+	[Preserve(AllMembers = true)]
 	internal class CoreNavigationPage : NavigationPage
 	{
-		public CoreNavigationPage ()
+		public CoreNavigationPage()
 		{
 			AutomationId = "NavigationPageRoot";
 
 			BarBackgroundColor = Color.Maroon;
 			BarTextColor = Color.Yellow;
 
-			Device.StartTimer(TimeSpan.FromSeconds(2), () => {
+			Device.StartTimer(TimeSpan.FromSeconds(2), () =>
+			{
 				BarBackgroundColor = Color.Default;
 				BarTextColor = Color.Default;
 
@@ -79,29 +83,45 @@ namespace Xamarin.Forms.Controls
 			});
 
 			On<iOS>().SetPrefersLargeTitles(true);
-		
-			Navigation.PushAsync (new CoreRootPage (this));
+
+			Navigation.PushAsync(new CoreRootPage(this));
+		}
+	}
+	[Preserve(AllMembers = true)]
+	public class CoreTabbedPageAsBottomNavigation : CoreTabbedPageBase
+	{
+		protected override void Init()
+		{
+			On<Android>().SetToolbarPlacement(ToolbarPlacement.Bottom);
+			base.Init();
 		}
 	}
 
-	[Preserve (AllMembers = true)]
-	[Issue (IssueTracker.Github, 2456, "StackOverflow after reordering tabs in a TabbedPageView", PlatformAffected.All)]
-	public class CoreTabbedPage : TestTabbedPage
+	[Preserve(AllMembers = true)]
+	[Issue(IssueTracker.Github, 2456, "StackOverflow after reordering tabs in a TabbedPageView", PlatformAffected.All)]
+	public class CoreTabbedPage : CoreTabbedPageBase
 	{
-		protected override void Init ()
+	}
+
+	[Preserve(AllMembers = true)]
+	public class CoreTabbedPageBase : TestTabbedPage
+	{
+		protected override void Init()
 		{
 		}
 #if APP
-		public CoreTabbedPage ()
+		public CoreTabbedPageBase()
 		{
 			AutomationId = "TabbedPageRoot";
 
 
-			Device.StartTimer(TimeSpan.FromSeconds(6), () => {
+			Device.StartTimer(TimeSpan.FromSeconds(6), () =>
+			{
 				BarBackgroundColor = Color.Maroon;
 				BarTextColor = Color.Yellow;
 
-				Device.StartTimer(TimeSpan.FromSeconds(6), () => {
+				Device.StartTimer(TimeSpan.FromSeconds(6), () =>
+				{
 					BarBackgroundColor = Color.Default;
 					BarTextColor = Color.Default;
 
@@ -114,37 +134,40 @@ namespace Xamarin.Forms.Controls
 			Children.Add(new CoreRootPage(this, NavigationBehavior.PushModalAsync) { Title = "Tab 1" });
 			Children.Add(new CoreRootPage(this, NavigationBehavior.PushModalAsync) { Title = "Tab 2" });
 			Children.Add(new NavigationPage(new Page())
-				{
-					Title = "Rubriques",
-					Icon = "coffee.png",
-					BarBackgroundColor = Color.Blue,
-					BarTextColor = Color.Aqua
-				});
+			{
+				Title = "Rubriques",
+				Icon = "coffee.png",
+				BarBackgroundColor = Color.Blue,
+				BarTextColor = Color.Aqua
+			});
 
 			Children.Add(new NavigationPage(new Page())
-				{
-					Title = "Le Club"
-				});
+			{
+				Title = "Le Club"
+			});
 
 			Children.Add(new NavigationPage(new Page { Title = "Bookmarks" })
+			{
+				Title = "Bookmarks",
+			});
+
+			if (On<Android>().GetMaxItemCount() > 5)
+			{
+				Children.Add(new NavigationPage(new Page { Title = "Alertes" })
 				{
-					Title = "Bookmarks",
+					Title = "Notifications",
 				});
 
-			Children.Add(new NavigationPage(new Page { Title = "Alertes" })
-				{
-					Title = "Notifications",  
-				});
-
-			Children.Add(new NavigationPage(new Page { Title = "My account" })
+				Children.Add(new NavigationPage(new Page { Title = "My account" })
 				{
 					Title = "My account",
 				});
 
-			Children.Add(new NavigationPage(new Page { Title = "About" })
+				Children.Add(new NavigationPage(new Page { Title = "About" })
 				{
 					Title = "About",
 				});
+			}
 		}
 #endif
 
@@ -170,54 +193,57 @@ namespace Xamarin.Forms.Controls
 #endif
 	}
 
-	[Preserve (AllMembers = true)]
+	[Preserve(AllMembers = true)]
 	internal class CoreViewContainer
 	{
 		public string Name { get; private set; }
 		public Type PageType { get; private set; }
 
-		public CoreViewContainer (string name, Type pageType)
+		public CoreViewContainer(string name, Type pageType)
 		{
 			Name = name;
 			PageType = pageType;
 		}
 	}
-
+	[Preserve(AllMembers = true)]
 	public class CoreRootView : ListView
 	{
-		public CoreRootView ()
+		public CoreRootView()
 		{
-			var roots = new [] {
-				new CoreViewContainer ("SwapRoot - CarouselPage", typeof(CoreCarouselPage)), 
+			var roots = new[] {
+				new CoreViewContainer ("SwapRoot - CarouselPage", typeof(CoreCarouselPage)),
 				new CoreViewContainer ("SwapRoot - ContentPage", typeof(CoreContentPage)),
 				new CoreViewContainer ("SwapRoot - MasterDetailPage", typeof(CoreMasterDetailPage)),
 				new CoreViewContainer ("SwapRoot - NavigationPage", typeof(CoreNavigationPage)),
 				new CoreViewContainer ("SwapRoot - TabbedPage", typeof(CoreTabbedPage)),
+				new CoreViewContainer ("SwapRoot - BottomNavigation TabbedPage", typeof(CoreTabbedPageAsBottomNavigation)),
 			};
 
-			var template = new DataTemplate (typeof(TextCell));
-			template.SetBinding (TextCell.TextProperty, "Name");
+			var template = new DataTemplate(typeof(TextCell));
+			template.SetBinding(TextCell.TextProperty, "Name");
 
 			ItemTemplate = template;
 			ItemsSource = roots;
 
 #if PRE_APPLICATION_CLASS
 			ItemSelected += (sender, args) => MessagingCenter.Send (this, Messages.ChangeRoot, ((CoreViewContainer)args.SelectedItem).PageType);
-#else			
-			ItemSelected += (sender, args) => {
+#else
+			ItemSelected += (sender, args) =>
+			{
 				var app = Application.Current as App;
-				if (app != null) {
-					var page = (Page)Activator.CreateInstance (((CoreViewContainer)args.SelectedItem).PageType);
-					app.SetMainPage (page);
-				}		
+				if (app != null)
+				{
+					var page = (Page)Activator.CreateInstance(((CoreViewContainer)args.SelectedItem).PageType);
+					app.SetMainPage(page);
+				}
 			};
 #endif
 			SetValue(AutomationProperties.NameProperty, "SwapRoot");
 		}
 	}
 
-	
 
+	[Preserve(AllMembers = true)]
 	internal class CorePageView : ListView
 	{
 		internal class GalleryPageFactory
@@ -230,7 +256,7 @@ namespace Xamarin.Forms.Controls
 					p.Title = title;
 					return p;
 				};
-			
+
 				Title = title;
 			}
 
@@ -238,13 +264,15 @@ namespace Xamarin.Forms.Controls
 			public string Title { get; set; }
 
 			public override string ToString()
-			{	
+			{
 				// a11y: let Narrator read a friendly string instead of the default ToString()
 				return Title;
 			}
 		}
 
 		List<GalleryPageFactory> _pages = new List<GalleryPageFactory> {
+				new GalleryPageFactory(() => new CollectionViewGallery(), "CollectionView Gallery"),
+				new GalleryPageFactory(() => new CollectionViewCoreGalleryPage(), "CollectionView Core Gallery"),
 				new GalleryPageFactory(() => new Issues.PerformanceGallery(), "Performance"),
 				new GalleryPageFactory(() => new EntryReturnTypeGalleryPage(), "Entry ReturnType "),
 				new GalleryPageFactory(() => new VisualStateManagerGallery(), "VisualStateManager Gallery"),
@@ -260,7 +288,9 @@ namespace Xamarin.Forms.Controls
 				new GalleryPageFactory(() => new EntryCoreGalleryPage(), "Entry Gallery"),
 				new GalleryPageFactory(() => new NavBarTitleTestPage(), "Titles And Navbar Windows"),
 				new GalleryPageFactory(() => new PanGestureGalleryPage(), "Pan gesture Gallery"),
+				new GalleryPageFactory(() => new SwipeGestureGalleryPage(), "Swipe gesture Gallery"),
 				new GalleryPageFactory(() => new PinchGestureTestPage(), "Pinch gesture Gallery"),
+				new GalleryPageFactory(() => new ClickGestureGalleryPage(), "Click gesture Gallery"),
 				new GalleryPageFactory(() => new AutomationIdGallery(), "AutomationID Gallery"),
 				new GalleryPageFactory(() => new LayoutPerformanceGallery(), "Layout Perf Gallery"),
 				new GalleryPageFactory(() => new ListViewSelectionColor(), "ListView SelectionColor Gallery"),
@@ -277,6 +307,7 @@ namespace Xamarin.Forms.Controls
 				new GalleryPageFactory(() => new EditorCoreGalleryPage(), "Editor Gallery"),
 				new GalleryPageFactory(() => new FrameCoreGalleryPage(), "Frame Gallery"),
 				new GalleryPageFactory(() => new ImageCoreGalleryPage(), "Image Gallery"),
+				new GalleryPageFactory(() => new ImageButtonCoreGalleryPage(), "Image Button Gallery"),
 				new GalleryPageFactory(() => new KeyboardCoreGallery(), "Keyboard Gallery"),
 				new GalleryPageFactory(() => new LabelCoreGalleryPage(), "Label Gallery"),
 				new GalleryPageFactory(() => new ListViewCoreGalleryPage(), "ListView Gallery"),
@@ -292,7 +323,9 @@ namespace Xamarin.Forms.Controls
 				new GalleryPageFactory(() => new SwitchCoreGalleryPage(), "Switch Gallery"),
 				new GalleryPageFactory(() => new TableViewCoreGalleryPage(), "TableView Gallery"),
 				new GalleryPageFactory(() => new TimePickerCoreGalleryPage(), "TimePicker Gallery"),
+				new GalleryPageFactory(() => new VisualGallery(), "Visual Gallery"),
 				new GalleryPageFactory(() => new WebViewCoreGalleryPage(), "WebView Gallery"),
+				new GalleryPageFactory(() => new WkWebViewCoreGalleryPage(), "WkWebView Gallery"),
 				//pages
  				new GalleryPageFactory(() => new RootContentPage ("Content"), "RootPages Gallery"),
 				new GalleryPageFactory(() => new MasterDetailPageTabletPage(), "MasterDetailPage Tablet Page"),
@@ -351,32 +384,36 @@ namespace Xamarin.Forms.Controls
 				new GalleryPageFactory(() => new UnevenListGallery(), "UnevenList Gallery - Legacy"),
 				new GalleryPageFactory(() => new ViewCellGallery(), "ViewCell Gallery - Legacy"),
 				new GalleryPageFactory(() => new WebViewGallery(), "WebView Gallery - Legacy"),
+				new GalleryPageFactory(() => new BindableLayoutGalleryPage(), "BindableLayout Gallery - Legacy"),
 			};
 
-		public CorePageView (Page rootPage, NavigationBehavior navigationBehavior = NavigationBehavior.PushAsync)
+		public CorePageView(Page rootPage, NavigationBehavior navigationBehavior = NavigationBehavior.PushAsync)
 		{
-			_titleToPage = _pages.ToDictionary (o => o.Title);
+			_titleToPage = _pages.ToDictionary(o => o.Title);
 
 			// avoid NRE for root pages without NavigationBar
-			if (navigationBehavior == NavigationBehavior.PushAsync && rootPage.GetType () == typeof (CoreNavigationPage)) {
-				_pages.Add (new GalleryPageFactory(() => new NavigationBarGallery((NavigationPage)rootPage), "NavigationBar Gallery - Legacy"));
+			if (navigationBehavior == NavigationBehavior.PushAsync && rootPage.GetType () == typeof (CoreNavigationPage))
+			{
+				_pages.Insert (0, new GalleryPageFactory(() => new NavigationBarGallery((NavigationPage)rootPage), "NavigationBar Gallery - Legacy"));
+				_pages.Insert(1, new GalleryPageFactory(() => new TitleView(true), "TitleView"));
 			}
 
-			var template = new DataTemplate (typeof(TextCell));
-			template.SetBinding (TextCell.TextProperty, "Title");
+			var template = new DataTemplate(typeof(TextCell));
+			template.SetBinding(TextCell.TextProperty, "Title");
 
 			BindingContext = _pages;
 			ItemTemplate = template;
 			ItemsSource = _pages;
 
-			ItemSelected += async (sender, args) => {
+			ItemSelected += async (sender, args) =>
+			{
 				if (SelectedItem == null)
 					return;
 
 				var item = args.SelectedItem;
 				var page = item as GalleryPageFactory;
 				if (page != null)
-					await PushPage (page.Realize());
+					await PushPage(page.Realize());
 
 				SelectedItem = null;
 			};
@@ -386,60 +423,69 @@ namespace Xamarin.Forms.Controls
 
 		NavigationBehavior navigationBehavior;
 
-		async Task PushPage (Page contentPage)
+		async Task PushPage(Page contentPage)
 		{
-			if (navigationBehavior == NavigationBehavior.PushModalAsync) {
-				await Navigation.PushModalAsync (contentPage);
-			} else {
-				await Navigation.PushAsync (contentPage);
+			if (navigationBehavior == NavigationBehavior.PushModalAsync)
+			{
+				await Navigation.PushModalAsync(contentPage);
+			}
+			else
+			{
+				await Navigation.PushAsync(contentPage);
 			}
 		}
 
 		readonly Dictionary<string, GalleryPageFactory> _titleToPage;
-		public async Task PushPage (string pageTitle)
+		public async Task PushPage(string pageTitle)
 		{
 
 			GalleryPageFactory pageFactory = null;
-			if (!_titleToPage.TryGetValue (pageTitle, out pageFactory))
+			if (!_titleToPage.TryGetValue(pageTitle, out pageFactory))
 				return;
 
 			var page = pageFactory.Realize();
 
-			await PushPage (page);
+			await PushPage(page);
 		}
 	}
-
+	[Preserve(AllMembers = true)]
 	internal class CoreRootPage : ContentPage
 	{
-		public CoreRootPage (Page rootPage, NavigationBehavior navigationBehavior = NavigationBehavior.PushAsync)
+		public CoreRootPage(Page rootPage, NavigationBehavior navigationBehavior = NavigationBehavior.PushAsync)
 		{
-			IStringProvider stringProvider = DependencyService.Get<IStringProvider> ();
+			ValidateRegistrar();
+
+			IStringProvider stringProvider = DependencyService.Get<IStringProvider>();
 
 			Title = stringProvider.CoreGalleryTitle;
 
-			var corePageView = new CorePageView (rootPage, navigationBehavior);
+			var corePageView = new CorePageView(rootPage, navigationBehavior);
 
-			var searchBar = new SearchBar () {
+			var searchBar = new SearchBar()
+			{
 				AutomationId = "SearchBar"
 			};
 
-			var testCasesButton = new Button {
+			var testCasesButton = new Button
+			{
 				Text = "Go to Test Cases",
 				AutomationId = "GoToTestButton",
-				Command = new Command (async () => {
-					if (!string.IsNullOrEmpty (searchBar.Text))
-						await corePageView.PushPage (searchBar.Text);
+				Command = new Command(async () =>
+				{
+					if (!string.IsNullOrEmpty(searchBar.Text))
+						await corePageView.PushPage(searchBar.Text);
 					else
-						await Navigation.PushModalAsync (TestCases.GetTestCases ());
+						await Navigation.PushModalAsync(TestCases.GetTestCases());
 				})
 			};
 
-			var stackLayout = new StackLayout () { 
+			var stackLayout = new StackLayout()
+			{
 				Children = {
 					testCasesButton,
 					searchBar,
 					new Button {
-						Text = "Click to Force GC", 
+						Text = "Click to Force GC",
 						Command = new Command(() => {
 							GC.Collect ();
 							GC.WaitForPendingFinalizers ();
@@ -450,7 +496,11 @@ namespace Xamarin.Forms.Controls
 				}
 			};
 
-			Content = new AbsoluteLayout {
+			this.SetAutomationPropertiesName("Gallery");
+			this.SetAutomationPropertiesHelpText("Lists all gallery pages");
+
+			Content = new AbsoluteLayout
+			{
 				Children = {
 					{ new CoreRootView (), new Rectangle(0, 0.0, 1, 0.35), AbsoluteLayoutFlags.All },
 					{ stackLayout, new Rectangle(0, 0.5, 1, 0.30), AbsoluteLayoutFlags.All },
@@ -458,18 +508,34 @@ namespace Xamarin.Forms.Controls
 				}
 			};
 		}
+
+		void ValidateRegistrar()
+		{
+			foreach (var view in Issues.Helpers.ViewHelper.GetAllViews())
+			{
+				if (!DependencyService.Get<IRegistrarValidationService>().Validate(view, out string message))
+					throw new InvalidOperationException(message);
+			}
+
+			foreach (var page in Issues.Helpers.ViewHelper.GetAllPages())
+			{
+				if (!DependencyService.Get<IRegistrarValidationService>().Validate(page, out string message))
+					throw new InvalidOperationException(message);
+			}
+		}
 	}
 
+	[Preserve(AllMembers = true)]
 	public interface IStringProvider
 	{
 		string CoreGalleryTitle { get; }
 	}
-
+	[Preserve(AllMembers = true)]
 	public static class CoreGallery
 	{
-		public static Page GetMainPage ()
+		public static Page GetMainPage()
 		{
-			return new CoreNavigationPage ();
+			return new CoreNavigationPage();
 		}
 	}
 }

@@ -3,7 +3,7 @@
 					xmlns:system="clr-namespace:System;assembly=mscorlib"
 					xmlns:wpf="clr-namespace:Xamarin.Forms.Platform.WPF">
 	<ResourceDictionary.MergedDictionaries>
-		<ResourceDictionary Source="/WPFLightToolkit;component/Assets/Default.xaml" />
+		<ResourceDictionary Source="/Xamarin.Forms.Platform.WPF;component/Assets/Default.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 
 	<!-- Default Global Color -->
@@ -290,8 +290,15 @@
 	</DataTemplate>
 
 	<DataTemplate x:Key="TableSectionHeader">
-		<TextBlock Text="{Binding Converter={StaticResource LowerConverter}}" Style="{StaticResource SubheaderTextBlockStyle}" 
-							FontSize="24" Foreground="Black" />
+		<TextBlock Text="{Binding Title, Converter={StaticResource LowerConverter}}" Style="{StaticResource SubheaderTextBlockStyle}" 
+							FontSize="24">
+			<TextBlock.Foreground>
+				<MultiBinding Converter="{StaticResource ColorConverter}" ConverterParameter="{x:Static TextBlock.ForegroundProperty}">
+					<Binding RelativeSource="{RelativeSource Self}"/>
+					<Binding Path="TextColor"/>
+				</MultiBinding>
+			</TextBlock.Foreground>
+		</TextBlock>
 	</DataTemplate>
 
 	<DataTemplate x:Key="TextCell">

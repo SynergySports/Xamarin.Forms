@@ -2,12 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.ComponentModel;
 using Xamarin.Forms.Internals;
+using Xamarin.Forms.PlatformConfiguration.TizenSpecific;
 using ElmSharp;
 using EProgressBar = ElmSharp.ProgressBar;
 using EButton = ElmSharp.Button;
 using EColor = ElmSharp.Color;
-using System.ComponentModel;
 
 namespace Xamarin.Forms.Platform.Tizen
 {
@@ -35,19 +36,17 @@ namespace Xamarin.Forms.Platform.Tizen
 		/// Gets the renderer associated with the <c>view</c>. If it doesn't exist, creates a new one.
 		/// </summary>
 		/// <returns>Renderer associated with the <c>view</c>.</returns>
-		/// <param name="view">View for which the renderer is going to be returned.</param>
-		public static IVisualElementRenderer GetOrCreateRenderer(VisualElement view)
+		/// <param name="element">VisualElement for which the renderer is going to be returned.</param>
+		public static IVisualElementRenderer GetOrCreateRenderer(VisualElement element)
 		{
-			return GetRenderer(view) ?? AttachRenderer(view);
+			return GetRenderer(element) ?? CreateRenderer(element);
 		}
 
-		internal static IVisualElementRenderer AttachRenderer(VisualElement view)
+		internal static IVisualElementRenderer CreateRenderer(VisualElement element)
 		{
-			IVisualElementRenderer visualElementRenderer = Registrar.Registered.GetHandlerForObject<IVisualElementRenderer>(view) ?? new DefaultRenderer();
-
-			visualElementRenderer.SetElement(view);
-
-			return visualElementRenderer;
+			IVisualElementRenderer renderer = Registrar.Registered.GetHandlerForObject<IVisualElementRenderer>(element) ?? new DefaultRenderer();
+			renderer.SetElement(element);
+			return renderer;
 		}
 
 		internal static ITizenPlatform CreatePlatform(EvasObject parent)
@@ -63,10 +62,21 @@ namespace Xamarin.Forms.Platform.Tizen
 			}
 			return platform;
 		}
+
+		public static SizeRequest GetNativeSize(VisualElement view, double widthConstraint, double heightConstraint)
+		{
+			widthConstraint = widthConstraint <= -1 ? double.PositiveInfinity : widthConstraint;
+			heightConstraint = heightConstraint <= -1 ? double.PositiveInfinity : heightConstraint;
+
+			double width = !double.IsPositiveInfinity(widthConstraint) ? widthConstraint : Int32.MaxValue;
+			double height = !double.IsPositiveInfinity(heightConstraint) ? heightConstraint : Int32.MaxValue;
+
+			return Platform.GetRenderer(view).GetDesiredSize(width, height);
+		}
 	}
 
 	[EditorBrowsable(EditorBrowsableState.Never)]
-	public interface ITizenPlatform : IPlatform, IDisposable
+	public interface ITizenPlatform : IDisposable
 	{
 		void SetPage(Page page);
 		bool SendBackButtonPressed();
@@ -87,9 +97,9 @@ namespace Xamarin.Forms.Platform.Tizen
 		bool _disposed;
 		Native.Dialog _pageBusyDialog;
 		int _pageBusyCount;
-		Naviframe _internalNaviframe;
+		readonly Naviframe _internalNaviframe;
 
-		HashSet<EvasObject> _alerts = new HashSet<EvasObject>();
+		readonly HashSet<EvasObject> _alerts = new HashSet<EvasObject>();
 
 		public event EventHandler<RootNativeViewChangedEventArgs> RootNativeViewChanged;
 
@@ -120,8 +130,6 @@ namespace Xamarin.Forms.Platform.Tizen
 		public Page Page { get; private set; }
 
 		public bool HasAlpha { get; set; }
-
-		Action BackPressedAction { get; set; }
 
 		Task CurrentModalNavigationTask { get; set; }
 		TaskCompletionSource<bool> CurrentTaskCompletionSource { get; set; }
@@ -158,9 +166,8 @@ namespace Xamarin.Forms.Platform.Tizen
 			_navModel.Push(newRoot, null);
 
 			Page = newRoot;
-			Page.Platform = this;
 
-			IVisualElementRenderer pageRenderer = Platform.AttachRenderer(Page);
+			IVisualElementRenderer pageRenderer = Platform.CreateRenderer(Page);
 			var naviItem = _internalNaviframe.Push(pageRenderer.NativeView);
 			naviItem.TitleBarVisible = false;
 
@@ -179,17 +186,6 @@ namespace Xamarin.Forms.Platform.Tizen
 				CurrentPageController?.SendAppearing();
 				return false;
 			});
-		}
-
-		public SizeRequest GetNativeSize(VisualElement view, double widthConstraint, double heightConstraint)
-		{
-			widthConstraint = widthConstraint <= -1 ? double.PositiveInfinity : widthConstraint;
-			heightConstraint = heightConstraint <= -1 ? double.PositiveInfinity : heightConstraint;
-
-			double width = !double.IsPositiveInfinity(widthConstraint) ? widthConstraint : Int32.MaxValue;
-			double height = !double.IsPositiveInfinity(heightConstraint) ? heightConstraint : Int32.MaxValue;
-
-			return Platform.GetRenderer(view).GetDesiredSize(width, height);
 		}
 
 		public bool SendBackButtonPressed()
@@ -282,11 +278,9 @@ namespace Xamarin.Forms.Platform.Tizen
 		async Task INavigation.PushModalAsync(Page modal, bool animated)
 		{
 			var previousPage = CurrentPageController;
-			Device.BeginInvokeOnMainThread(()=> previousPage?.SendDisappearing());
+			Device.BeginInvokeOnMainThread(() => previousPage?.SendDisappearing());
 
 			_navModel.PushModal(modal);
-
-			modal.Platform = this;
 
 			await PushModalInternal(modal, animated);
 
@@ -403,8 +397,19 @@ namespace Xamarin.Forms.Platform.Tizen
 			{
 				_pageBusyDialog = new Native.Dialog(Forms.NativeParent)
 				{
-					Orientation = PopupOrientation.Top,
+					Orientation = PopupOrientation.Center,
+					BackgroundColor = EColor.Transparent
 				};
+
+				if (Device.Idiom == TargetIdiom.Phone)
+				{
+					_pageBusyDialog.SetPartColor("bg_title", EColor.Transparent);
+					_pageBusyDialog.SetPartColor("bg_content", EColor.Transparent);
+				}
+				else if (Device.Idiom == TargetIdiom.Watch)
+				{
+					_pageBusyDialog.Style = "circle";
+				}
 
 				var activity = new EProgressBar(_pageBusyDialog)
 				{
@@ -435,10 +440,11 @@ namespace Xamarin.Forms.Platform.Tizen
 			if (!PageIsChildOfPlatform(sender))
 				return;
 
-			Native.Dialog alert = new Native.Dialog(Forms.NativeParent);
+			Native.Dialog alert = Native.Dialog.CreateDialog(Forms.NativeParent, (arguments.Accept != null));
+
 			alert.Title = arguments.Title;
 			var message = arguments.Message.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace(Environment.NewLine, "<br>");
-			alert.Text = message;
+			alert.Message = message;
 
 			EButton cancel = new EButton(alert) { Text = arguments.Cancel };
 			alert.NegativeButton = cancel;
@@ -476,7 +482,7 @@ namespace Xamarin.Forms.Platform.Tizen
 			if (!PageIsChildOfPlatform(sender))
 				return;
 
-			Native.Dialog alert = new Native.Dialog(Forms.NativeParent);
+			Native.Dialog alert = Native.Dialog.CreateDialog(Forms.NativeParent);
 
 			alert.Title = arguments.Title;
 			Box box = new Box(alert);
@@ -486,6 +492,7 @@ namespace Xamarin.Forms.Platform.Tizen
 				Native.Button destruction = new Native.Button(alert)
 				{
 					Text = arguments.Destruction,
+					Style = ButtonStyle.Text,
 					TextColor = EColor.Red,
 					AlignmentX = -1
 				};
@@ -503,6 +510,7 @@ namespace Xamarin.Forms.Platform.Tizen
 				Native.Button button = new Native.Button(alert)
 				{
 					Text = buttonName,
+					Style = ButtonStyle.Text,
 					AlignmentX = -1
 				};
 				button.Clicked += (s, evt) =>

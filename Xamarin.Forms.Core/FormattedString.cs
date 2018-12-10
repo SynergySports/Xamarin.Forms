@@ -11,6 +11,7 @@ namespace Xamarin.Forms
 	public class FormattedString : Element
 	{
 		readonly SpanCollection _spans = new SpanCollection();
+		internal event NotifyCollectionChangedEventHandler SpansCollectionChanged;
 
 		public FormattedString()
 		{
@@ -53,7 +54,11 @@ namespace Xamarin.Forms
 					var bo = item as Span;
 					bo.Parent = null;
 					if (bo != null)
+					{
+						bo.PropertyChanging -= OnItemPropertyChanging;
 						bo.PropertyChanged -= OnItemPropertyChanged;
+					}
+						
 				}
 			}
 
@@ -64,16 +69,26 @@ namespace Xamarin.Forms
 					var bo = item as Span;
 					bo.Parent = this;
 					if (bo != null)
+					{
+						bo.PropertyChanging += OnItemPropertyChanging;
 						bo.PropertyChanged += OnItemPropertyChanged;
+					}
+						
 				}
 			}
 
-			OnPropertyChanged("Spans");
+			OnPropertyChanged(nameof(Spans));
+			SpansCollectionChanged?.Invoke(sender, e);
 		}
 
 		void OnItemPropertyChanged(object sender, PropertyChangedEventArgs e)
 		{
-			OnPropertyChanged("Spans");
+			OnPropertyChanged(nameof(Spans));
+		}
+
+		void OnItemPropertyChanging(object sender, PropertyChangingEventArgs e)
+		{
+			OnPropertyChanging(nameof(Spans));
 		}
 
 		class SpanCollection : ObservableCollection<Span>
@@ -92,6 +107,13 @@ namespace Xamarin.Forms
 					throw new ArgumentNullException("item");
 
 				base.SetItem(index, item);
+			}
+
+			protected override void ClearItems()
+			{
+				List<Span> removed = new List<Span>(this);
+				base.ClearItems();
+				base.OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed));
 			}
 		}
 	}

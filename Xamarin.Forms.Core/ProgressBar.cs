@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Xamarin.Forms.Internals;
 using Xamarin.Forms.Platform;
@@ -11,6 +12,8 @@ namespace Xamarin.Forms
 		public static readonly BindableProperty ProgressColorProperty = BindableProperty.Create(nameof(ProgressColor), typeof(Color), typeof(ProgressBar), Color.Default);
 
 		public static readonly BindableProperty ProgressProperty = BindableProperty.Create(nameof(Progress), typeof(double), typeof(ProgressBar), 0d, coerceValue: (bo, v) => ((double)v).Clamp(0, 1));
+
+		protected override bool TabStopDefaultValueCreator() => false;
 
 		readonly Lazy<PlatformConfigurationRegistry<ProgressBar>> _platformConfigurationRegistry;
 
@@ -43,6 +46,31 @@ namespace Xamarin.Forms
 		public IPlatformElementConfiguration<T, ProgressBar> On<T>() where T : IConfigPlatform
 		{
 			return _platformConfigurationRegistry.Value.On<T>();
+		}
+
+
+		protected override void OnPropertyChanged([CallerMemberName] string propertyName = null)
+		{
+			base.OnPropertyChanged(propertyName);
+
+			if (propertyName == VisualProperty.PropertyName ||
+				propertyName == BackgroundColorProperty.PropertyName ||
+				propertyName == ProgressColorProperty.PropertyName ||
+				propertyName == HeightRequestProperty.PropertyName)
+			{
+				// Todo fix reset behavior if user sets back 
+				if ((this as IVisualController).EffectiveVisual == VisualMarker.Material)
+				{
+					if (BackgroundColor == Color.Default)
+						BackgroundColor = Color.FromRgb(179, 215, 243);
+
+					if (ProgressColor == Color.Default)
+						ProgressColor = Color.FromRgb(33, 150, 243);
+
+					if (!IsSet(HeightRequestProperty))
+						HeightRequest = 5;
+				}
+			}
 		}
 	}
 }

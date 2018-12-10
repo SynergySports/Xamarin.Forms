@@ -19,6 +19,7 @@ namespace Xamarin.Forms.Platform.Android
 	{
 		bool _disposed;
 		TextColorSwitcher _textColorSwitcher;
+		ColorStateList defaultPlaceholdercolor;
 
 		public EditorRenderer(Context context) : base(context)
 		{
@@ -72,6 +73,8 @@ namespace Xamarin.Forms.Platform.Android
 
 				var useLegacyColorManagement = e.NewElement.UseLegacyColorManagement();
 				_textColorSwitcher = new TextColorSwitcher(edit.TextColors, useLegacyColorManagement);
+
+				defaultPlaceholdercolor = Control.HintTextColors;
 			}
 
 			edit.SetSingleLine(false);
@@ -85,6 +88,8 @@ namespace Xamarin.Forms.Platform.Android
 			UpdateTextColor();
 			UpdateFont();
 			UpdateMaxLength();
+			UpdatePlaceholderColor();
+			UpdatePlaceholderText();
 		}
 
 		protected override void OnElementPropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -94,6 +99,8 @@ namespace Xamarin.Forms.Platform.Android
 			else if (e.PropertyName == InputView.KeyboardProperty.PropertyName)
 				UpdateInputType();
 			else if (e.PropertyName == InputView.IsSpellCheckEnabledProperty.PropertyName)
+				UpdateInputType();
+			else if (e.PropertyName == Editor.IsTextPredictionEnabledProperty.PropertyName)
 				UpdateInputType();
 			else if (e.PropertyName == Editor.TextColorProperty.PropertyName)
 				UpdateTextColor();
@@ -105,6 +112,10 @@ namespace Xamarin.Forms.Platform.Android
 				UpdateFont();
 			else if (e.PropertyName == InputView.MaxLengthProperty.PropertyName)
 				UpdateMaxLength();
+			else if (e.PropertyName == Editor.PlaceholderProperty.PropertyName)
+				UpdatePlaceholderText();
+			else if (e.PropertyName == Editor.PlaceholderColorProperty.PropertyName)
+				UpdatePlaceholderColor();
 
 			base.OnElementPropertyChanged(sender, e);
 		}
@@ -156,12 +167,17 @@ namespace Xamarin.Forms.Platform.Android
 			var keyboard = model.Keyboard;
 
 			edit.InputType = keyboard.ToInputType() | InputTypes.TextFlagMultiLine;
-			if (!(keyboard is Internals.CustomKeyboard) && model.IsSet(InputView.IsSpellCheckEnabledProperty))
+			if (!(keyboard is Internals.CustomKeyboard))
 			{
-				if ((edit.InputType & InputTypes.TextFlagNoSuggestions) != InputTypes.TextFlagNoSuggestions)
+				if (model.IsSet(InputView.IsSpellCheckEnabledProperty))
 				{
 					if (!model.IsSpellCheckEnabled)
-						edit.InputType = edit.InputType | InputTypes.TextFlagNoSuggestions;
+						edit.InputType = edit.InputType | InputTypes.TextFlagNoSuggestions;					
+				}
+				if (model.IsSet(Editor.IsTextPredictionEnabledProperty))
+				{
+					if (!model.IsTextPredictionEnabled)
+						edit.InputType = edit.InputType | InputTypes.TextFlagNoSuggestions;					
 				}
 			}
 
@@ -185,6 +201,22 @@ namespace Xamarin.Forms.Platform.Android
 		void UpdateTextColor()
 		{
 			_textColorSwitcher?.UpdateTextColor(Control, Element.TextColor);
+		}
+
+		void UpdatePlaceholderText()
+		{
+			if (Control.Hint == Element.Placeholder)
+				return;
+
+			Control.Hint = Element.Placeholder;
+		}
+
+		void UpdatePlaceholderColor()
+		{
+			if (Element.PlaceholderColor == Color.Default)
+				Control.SetHintTextColor(defaultPlaceholdercolor);
+			else
+				Control.SetHintTextColor(Element.PlaceholderColor.ToAndroid());
 		}
 
 		void OnKeyboardBackPressed(object sender, EventArgs eventArgs)

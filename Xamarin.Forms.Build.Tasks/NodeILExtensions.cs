@@ -103,8 +103,13 @@ namespace Xamarin.Forms.Build.Tasks
 			if (compiledConverterName != null && (compiledConverterType = Type.GetType (compiledConverterName)) != null) {
 				var compiledConverter = Activator.CreateInstance (compiledConverterType);
 				var converter = typeof(ICompiledTypeConverter).GetMethods ().FirstOrDefault (md => md.Name == "ConvertFromString");
-				var instructions = (IEnumerable<Instruction>)converter.Invoke (compiledConverter, new object[] {
+				IEnumerable<Instruction> instructions;
+				try {
+					instructions = (IEnumerable<Instruction>)converter.Invoke(compiledConverter, new object[] {
 					node.Value as string, context, node as BaseNode});
+				} catch (System.Reflection.TargetInvocationException tie) when (tie.InnerException is XamlParseException) {
+					throw tie.InnerException;
+				}
 				foreach (var i in instructions)
 					yield return i;
 				if (targetTypeRef.IsValueType && boxValueTypes)
@@ -161,21 +166,21 @@ namespace Xamarin.Forms.Build.Tasks
 			if (targetTypeRef.ResolveCached().BaseType != null && targetTypeRef.ResolveCached().BaseType.FullName == "System.Enum")
 				yield return PushParsedEnum(targetTypeRef, str, node);
 			else if (targetTypeRef.FullName == "System.Char")
-				yield return Instruction.Create(OpCodes.Ldc_I4, Char.Parse(str));
+				yield return Instruction.Create(OpCodes.Ldc_I4, unchecked((int)Char.Parse(str)));
 			else if (targetTypeRef.FullName == "System.SByte")
-				yield return Instruction.Create(OpCodes.Ldc_I4, SByte.Parse(str, CultureInfo.InvariantCulture));
+				yield return Instruction.Create(OpCodes.Ldc_I4, unchecked((int)SByte.Parse(str, CultureInfo.InvariantCulture)));
 			else if (targetTypeRef.FullName == "System.Int16")
-				yield return Instruction.Create(OpCodes.Ldc_I4, Int16.Parse(str, CultureInfo.InvariantCulture));
+				yield return Instruction.Create(OpCodes.Ldc_I4, unchecked((int)Int16.Parse(str, CultureInfo.InvariantCulture)));
 			else if (targetTypeRef.FullName == "System.Int32")
 				yield return Instruction.Create(OpCodes.Ldc_I4, Int32.Parse(str, CultureInfo.InvariantCulture));
 			else if (targetTypeRef.FullName == "System.Int64")
 				yield return Instruction.Create(OpCodes.Ldc_I8, Int64.Parse(str, CultureInfo.InvariantCulture));
 			else if (targetTypeRef.FullName == "System.Byte")
-				yield return Instruction.Create(OpCodes.Ldc_I4, Byte.Parse(str, CultureInfo.InvariantCulture));
+				yield return Instruction.Create(OpCodes.Ldc_I4, unchecked((int)Byte.Parse(str, CultureInfo.InvariantCulture)));
 			else if (targetTypeRef.FullName == "System.UInt16")
 				yield return Instruction.Create(OpCodes.Ldc_I4, unchecked((int)UInt16.Parse(str, CultureInfo.InvariantCulture)));
 			else if (targetTypeRef.FullName == "System.UInt32")
-				yield return Instruction.Create(OpCodes.Ldc_I4, UInt32.Parse(str, CultureInfo.InvariantCulture));
+				yield return Instruction.Create(OpCodes.Ldc_I4, unchecked((int)UInt32.Parse(str, CultureInfo.InvariantCulture)));
 			else if (targetTypeRef.FullName == "System.UInt64")
 				yield return Instruction.Create(OpCodes.Ldc_I8, unchecked((long)UInt64.Parse(str, CultureInfo.InvariantCulture)));
 			else if (targetTypeRef.FullName == "System.Single")
@@ -482,7 +487,7 @@ namespace Xamarin.Forms.Build.Tasks
 
 			yield return Create(Newobj, module.ImportCtorReference(("Xamarin.Forms.Xaml", "Xamarin.Forms.Xaml.Internals", "XamlServiceProvider"), parameterTypes: null));
 
-			//Add a SimpleValueTargetProvider
+			//Add a SimpleValueTargetProvider and register it as IProvideValueTarget and IReferenceProvider
 			var pushParentIl = node.PushParentObjectsArray(context).ToList();
 			if (pushParentIl[pushParentIl.Count - 1].OpCode != Ldnull) {
 				yield return Create(Dup); //Keep the serviceProvider on the stack
@@ -495,19 +500,23 @@ namespace Xamarin.Forms.Build.Tasks
 				foreach (var instruction in PushTargetProperty(bpRef, propertyRef, declaringTypeReference, module))
 					yield return instruction;
 
-				yield return Create(Newobj, module.ImportCtorReference(("Xamarin.Forms.Xaml", "Xamarin.Forms.Xaml.Internals", "SimpleValueTargetProvider"), paramCount: 2));
-				yield return Create(Callvirt, addService);
-			}
+				if (context.Scopes.TryGetValue(node, out var scope))
+					yield return Create(Ldloc, scope.Item1);
+				else
+					yield return Create(Ldnull);
 
-			//Add a NamescopeProvider
-			if (context.Scopes.ContainsKey(node)) {
-				yield return Create(Dup); //Duplicate the serviceProvider
-				yield return Create(Ldtoken, module.ImportReference(("Xamarin.Forms.Core", "Xamarin.Forms.Xaml.Internals", "INameScopeProvider")));
+				yield return Create(Newobj, module.ImportCtorReference(("Xamarin.Forms.Xaml", "Xamarin.Forms.Xaml.Internals", "SimpleValueTargetProvider"), paramCount: 3));
+				//store the provider so we can register it again with a different key
+				yield return Create(Dup);
+				var refProvider = new VariableDefinition(module.ImportReference(("mscorlib", "System", "Object")));
+				context.Body.Variables.Add(refProvider);
+				yield return Create(Stloc, refProvider);
+				yield return Create(Callvirt, addService);
+
+				yield return Create(Dup); //Keep the serviceProvider on the stack
+				yield return Create(Ldtoken, module.ImportReference(("Xamarin.Forms.Core", "Xamarin.Forms.Xaml", "IReferenceProvider")));
 				yield return Create(Call, module.ImportMethodReference(("mscorlib", "System", "Type"), methodName: "GetTypeFromHandle", parameterTypes: new[] { ("mscorlib", "System", "RuntimeTypeHandle") }, isStatic: true));
-				yield return Create(Newobj, module.ImportCtorReference(("Xamarin.Forms.Xaml", "Xamarin.Forms.Xaml.Internals", "NameScopeProvider"), parameterTypes: null));
-				yield return Create(Dup); //Duplicate the namescopeProvider
-				yield return Create(Ldloc, context.Scopes[node].Item1);
-				yield return Create(Callvirt, module.ImportPropertySetterReference(("Xamarin.Forms.Xaml", "Xamarin.Forms.Xaml.Internals", "NameScopeProvider"), propertyName: "NameScope"));
+				yield return Create(Ldloc, refProvider);
 				yield return Create(Callvirt, addService);
 			}
 

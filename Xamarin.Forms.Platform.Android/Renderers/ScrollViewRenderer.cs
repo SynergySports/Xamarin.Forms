@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Android.Animation;
 using Android.Content;
 using Android.Graphics;
+using Android.Support.V4.Widget;
 using Android.Views;
 using Android.Widget;
 using Xamarin.Forms.Internals;
@@ -12,7 +13,7 @@ using AView = Android.Views.View;
 
 namespace Xamarin.Forms.Platform.Android
 {
-	public class ScrollViewRenderer : AScrollView, IVisualElementRenderer, IEffectControlProvider
+	public class ScrollViewRenderer : NestedScrollView, IVisualElementRenderer, IEffectControlProvider
 	{
 		ScrollViewContainer _container;
 		HorizontalScrollView _hScrollView;
@@ -24,6 +25,9 @@ namespace Xamarin.Forms.Platform.Android
 		ScrollView _view;
 		int _previousBottom;
 		bool _isEnabled;
+		bool _disposed;
+		LayoutDirection _prevLayoutDirection = LayoutDirection.Ltr;
+		bool _checkedForRtlScroll = false;
 
 		public ScrollViewRenderer(Context context) : base(context)
 		{
@@ -92,6 +96,7 @@ namespace Xamarin.Forms.Platform.Android
 				UpdateIsEnabled();
 				UpdateHorizontalScrollBarVisibility();
 				UpdateVerticalScrollBarVisibility();
+				UpdateFlowDirection();
 
 				element.SendViewInitialized(this);
 
@@ -100,6 +105,22 @@ namespace Xamarin.Forms.Platform.Android
 			}
 
 			EffectUtilities.RegisterEffectControlProvider(this, oldElement, element);
+		}
+
+		void UpdateFlowDirection()
+		{
+			if (Element is IVisualElementController controller)
+			{
+				var flowDirection = controller.EffectiveFlowDirection.IsLeftToRight()
+					? LayoutDirection.Ltr
+					: LayoutDirection.Rtl;
+
+				if (_prevLayoutDirection != flowDirection && _hScrollView != null)
+				{
+					_prevLayoutDirection = flowDirection;
+					_hScrollView.LayoutDirection = flowDirection;
+				}
+			}
 		}
 
 		public VisualElementTracker Tracker { get; private set; }
@@ -176,21 +197,27 @@ namespace Xamarin.Forms.Platform.Android
 
 		protected override void Dispose(bool disposing)
 		{
-			base.Dispose(disposing);
+			if (_disposed)
+			{
+				return;
+			}
 
-			SetElement(null);
+			_disposed = true;
 
 			if (disposing)
 			{
-				Tracker.Dispose();
+				SetElement(null);
+				Tracker?.Dispose();
 				Tracker = null;
 				RemoveAllViews();
-				_container.Dispose();
+				_container?.Dispose();
 				_container = null;
 			}
+
+			base.Dispose(disposing);
 		}
 
-		protected override void OnAttachedToWindow()
+		public override void OnAttachedToWindow()
 		{
 			base.OnAttachedToWindow();
 
@@ -219,15 +246,29 @@ namespace Xamarin.Forms.Platform.Android
 			bool requestContainerLayout = bottom > _previousBottom;
 			_previousBottom = bottom;
 
+			_container.Measure(MeasureSpecFactory.MakeMeasureSpec(right - left, MeasureSpecMode.Unspecified),
+				MeasureSpecFactory.MakeMeasureSpec(bottom - top, MeasureSpecMode.Unspecified));
 			base.OnLayout(changed, left, top, right, bottom);
 			if (_view.Content != null && _hScrollView != null)
 				_hScrollView.Layout(0, 0, right - left, Math.Max(bottom - top, (int)Context.ToPixels(_view.Content.Height)));
-			else if(_view.Content != null && requestContainerLayout)
+			else if (_view.Content != null && requestContainerLayout)
 				_container?.RequestLayout();
+
+			// if the target sdk >= 17 then setting the LayoutDirection on the scroll view natively takes care of the scroll
+			if (!_checkedForRtlScroll && _hScrollView != null && Element is IVisualElementController controller && controller.EffectiveFlowDirection.IsRightToLeft())
+			{
+				if (Context.TargetSdkVersion() < 17)
+					_hScrollView.ScrollX = _container.MeasuredWidth - _hScrollView.MeasuredWidth - _hScrollView.ScrollX;
+				else
+					Device.BeginInvokeOnMainThread(() => UpdateScrollPosition(_hScrollView.ScrollX, ScrollY));
+			}
+
+			_checkedForRtlScroll = true;
 		}
 
 		protected override void OnScrollChanged(int l, int t, int oldl, int oldt)
 		{
+			_checkedForRtlScroll = true;
 			base.OnScrollChanged(l, t, oldl, oldt);
 			var context = Context;
 			UpdateScrollPosition(context.FromPixels(l), context.FromPixels(t));
@@ -286,6 +327,8 @@ namespace Xamarin.Forms.Platform.Android
 				UpdateHorizontalScrollBarVisibility();
 			else if (e.PropertyName == ScrollView.VerticalScrollBarVisibilityProperty.PropertyName)
 				UpdateVerticalScrollBarVisibility();
+			else if (e.PropertyName == VisualElement.FlowDirectionProperty.PropertyName)
+				UpdateFlowDirection();
 		}
 
 		void UpdateIsEnabled()
@@ -305,6 +348,8 @@ namespace Xamarin.Forms.Platform.Android
 
 		async void OnScrollToRequested(object sender, ScrollToRequestedEventArgs e)
 		{
+			_checkedForRtlScroll = true;
+
 			if (!_isAttached)
 			{
 				return;
@@ -410,7 +455,10 @@ namespace Xamarin.Forms.Platform.Android
 			if (_view.Orientation == ScrollOrientation.Horizontal || _view.Orientation == ScrollOrientation.Both)
 			{
 				if (_hScrollView == null)
+				{
 					_hScrollView = new AHorizontalScrollView(Context, this);
+					UpdateFlowDirection();
+				}
 
 				((AHorizontalScrollView)_hScrollView).IsBidirectional = _isBidirectional = _view.Orientation == ScrollOrientation.Both;
 

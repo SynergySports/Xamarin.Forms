@@ -10,6 +10,7 @@ namespace Xamarin.Forms.Platform.MacOS
 	{
 		Application _application;
 		bool _isSuspended;
+		static int _storyboardMainMenuCount;
 
 		public Action<MenuItem, NSMenuItem> NativeMenuActivated { get; set; }
 		public Action<MenuItem, NSMenuItem> NativeMenuPropertiesBinding { get; set; }
@@ -30,6 +31,9 @@ namespace Xamarin.Forms.Platform.MacOS
 
 			Application.SetCurrentApplication(application);
 			_application = application;
+
+			if(NSApplication.SharedApplication.MainMenu != null)
+				_storyboardMainMenuCount = (int)NSApplication.SharedApplication.MainMenu.Count;
 
 			application.PropertyChanged += ApplicationOnPropertyChanged;
 		}
@@ -126,8 +130,8 @@ namespace Xamarin.Forms.Platform.MacOS
 
 		protected virtual void ClearNSMenu(NSMenu menu)
 		{
-			//for now we can't remove the 1st menu item		
-			for (var i = menu.Count - 1; i > 0; i--)
+			// remove the menu that was created in the code
+			for (var i = menu.Count - _storyboardMainMenuCount; i > 0; i--)
 				menu.RemoveItemAt(i);
 		}
 	}
