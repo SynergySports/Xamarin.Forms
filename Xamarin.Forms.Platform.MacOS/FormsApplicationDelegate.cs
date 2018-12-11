@@ -12,8 +12,7 @@ namespace Xamarin.Forms.Platform.MacOS
 		bool _isSuspended;
 		static int _storyboardMainMenuCount;
 
-		public Action<MenuItem, NSMenuItem> NativeMenuActivated { get; set; }
-		public Action<MenuItem, NSMenuItem> NativeMenuPropertiesBinding { get; set; }
+		public Func<MenuItem, NSMenuItem> NativeMenuItemCreator { get; set; }
 		public abstract NSWindow MainWindow { get; }
 
 		protected override void Dispose(bool disposing)
@@ -123,9 +122,10 @@ namespace Xamarin.Forms.Platform.MacOS
 			SetupMainAppMenu(nsMenu);
 		}
 
-		protected virtual void SetupMainAppMenu(NSMenu menu)
+		protected virtual void SetupMainAppMenu(NSMenu nativeMenu)
 		{
-			Element.GetMenu(_application).ToNSMenu(menu, NativeMenuPropertiesBinding, NativeMenuActivated);
+			var menu = Element.GetMenu(_application);
+			menu.ToNSMenu(nativeMenu, NativeMenuItemCreator);
 		}
 
 		protected virtual void ClearNSMenu(NSMenu menu)
