@@ -10,12 +10,23 @@ namespace Xamarin.Forms.Platform.macOS.Extensions
 		{
 			if (nsMenu == null)
 				nsMenu = new NSMenu(menus.Text ?? "");
+			nsMenu.AutoEnablesItems = false;
 
 			foreach (var menu in menus)
 			{
-				var menuItem = new NSMenuItem(menu.Text ?? "");
-				var subMenu = new NSMenu(menu.Text ?? "");
-				menuItem.Submenu = subMenu;
+				NSMenuItem menuItem = null;
+				NSMenu subMenu = null;
+				if (string.IsNullOrEmpty(menu.Text))
+				{
+					menuItem = nsMenu.Items.FirstOrDefault();
+					subMenu = menuItem?.Submenu;
+				}
+				if (menuItem == null)
+				{
+					menuItem = new NSMenuItem(menu.Text ?? "");
+					menuItem.Submenu = subMenu = new NSMenu(menu.Text ?? "");
+				}
+
 				foreach (var item in menu.Items)
 				{
 					var subMenuItem = item.ToNSMenuItem(menuItemCreator: menuItemCreator);
@@ -23,7 +34,8 @@ namespace Xamarin.Forms.Platform.macOS.Extensions
 					subMenu.AddItem(subMenuItem);
 					item.PropertyChanged += (sender, e) => (sender as MenuItem)?.UpdateNSMenuItem(subMenuItem, new string[] { e.PropertyName });
 				}
-				nsMenu.AddItem(menuItem);
+				if (!nsMenu.Items.Contains(menuItem))
+					nsMenu.AddItem(menuItem);
 				menu.ToNSMenu(subMenu, menuItemCreator);
 			}
 			return nsMenu;

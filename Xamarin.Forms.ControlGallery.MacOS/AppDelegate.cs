@@ -56,6 +56,11 @@ namespace Xamarin.Forms.ControlGallery.MacOS
 
 			var menu = new Menu();
 
+			var appMenu = new Menu();
+
+			appMenu.Items.Add(new MenuItem { Text = "App menu test" });
+			menu.Add(appMenu);
+
 			var fileMenu = new Menu { Text = "File" };
 			fileMenu.Items.Add(new MenuItem { Text = "New" });
 			fileMenu.Items.Add(new MenuItem { Text = "Open" });
@@ -67,6 +72,7 @@ namespace Xamarin.Forms.ControlGallery.MacOS
 			viewMenu.Items.Add(smallIconsMenuItem);
 			viewMenu.Items.Add(new MenuItem { Text = "Large icons" });
 			viewMenu.Items.Add(new SeparatorMenuItem());
+			viewMenu.Items.Add(new MenuItem { Text = "List", IsEnabled = false });
 			viewMenu.Items.Add(new MenuItem { Text = "Details" });
 			menu.Add(viewMenu);
 
@@ -78,7 +84,6 @@ namespace Xamarin.Forms.ControlGallery.MacOS
 				var nsMenuItem = sender as NSMenuItem;
 				nsMenuItem.State = nsMenuItem.State == NSCellStateValue.On ? NSCellStateValue.Off : NSCellStateValue.On;
 			}
-
 
 			void CheckableMenuItem_Clicked(object sender, EventArgs e)
 			{
