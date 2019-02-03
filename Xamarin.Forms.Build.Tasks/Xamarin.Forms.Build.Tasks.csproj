@@ -8,7 +8,7 @@
 	<PropertyGroup>
 	    <_DisableStrongNamer Condition=" '$(_DisableStrongNamer)' != 'True' ">False</_DisableStrongNamer>
 	    <AssemblyName>Xamarin.Forms.Build.Tasks</AssemblyName>
-	    <TargetFrameworks>net46;netstandard2.0</TargetFrameworks>
+	    <TargetFrameworks>net461;netstandard2.0</TargetFrameworks>
 	    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 	    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 	    <SignAssembly Condition=" '$(_DisableStrongNamer)' != 'True' ">True</SignAssembly>
@@ -58,7 +58,7 @@
 	</Target>
 
   <Target Name="_StrongName" AfterTargets="Build" DependsOnTargets="_SetSnExe" Condition="'$(TargetPath)' != ''" Inputs="$(TargetPath)" Outputs="$(IntermediateOutputPath)Sn.stamp">
-  	<Exec Command='"$(SnExe)" -R $(TargetPath) ..\xamarin.forms.snk' Condition=" '$(SignAssembly)' == 'true' " />
+  	<Exec Command="&quot;$(SnExe)&quot; -R $(TargetPath) ..\xamarin.forms.snk" Condition=" '$(SignAssembly)' == 'true' " />
   </Target>
 
   <Target Name="_CopyToNuspecDir" AfterTargets="_StrongName;Build">
