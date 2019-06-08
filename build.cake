@@ -140,13 +140,6 @@ Task("VSMAC")
     .IsDependentOn("BuildHack")
     .Does(() =>
     {
-        MSBuild("./Xamarin.Forms.ControlGallery.Android/Xamarin.Forms.ControlGallery.Android.csproj", 
-                GetMSBuildSettings()
-                    .WithRestore()
-                    // work around bug on vs mac where resources generate wrong first time
-                    .WithTarget("rebuild")
-        );
-
         StartProcess("open", new ProcessSettings{ Arguments = "Xamarin.Forms.sln" });        
     });
 
@@ -198,6 +191,7 @@ MSBuildSettings GetMSBuildSettings()
 
     msbuildSettings.PlatformTarget = PlatformTarget.MSIL;
     msbuildSettings.MSBuildPlatform = (Cake.Common.Tools.MSBuild.MSBuildPlatform)1;
+    msbuildSettings.ToolVersion = MSBuildToolVersion.VS2019;
     msbuildSettings.Configuration = configuration;
     return msbuildSettings;
 

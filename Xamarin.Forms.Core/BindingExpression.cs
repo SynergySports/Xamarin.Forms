@@ -322,10 +322,10 @@ namespace Xamarin.Forms
 				{
 					ParameterInfo parameter = null;
 					ParameterInfo[] array = property.GetIndexParameters();
-					for (int i = 0; i < array.Length; i++)
+
+					if (array.Length > 0)
 					{
-						parameter = array[i];
-						break;
+						parameter = array[0];
 					}
 
 					if (parameter != null)
@@ -630,7 +630,7 @@ namespace Xamarin.Forms
 							value = LastGetter.Invoke(value, Arguments);
 						}
 						catch (TargetInvocationException ex) {
-							if (ex.InnerException is KeyNotFoundException || ex.InnerException is IndexOutOfRangeException) {
+							if (ex.InnerException is KeyNotFoundException || ex.InnerException is IndexOutOfRangeException || ex.InnerException is ArgumentOutOfRangeException) {
 								value = null;
 								return false;
 							}

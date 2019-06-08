@@ -11,7 +11,7 @@ namespace Xamarin.Forms
 
 		protected HandlerAttribute(Type handler, Type target, Type[] supportedVisuals)
 		{
-			SupportedVisuals = supportedVisuals ?? new[] { typeof(VisualRendererMarker.Default) };
+			SupportedVisuals = supportedVisuals ?? new[] { typeof(VisualMarker.DefaultVisual) };
 			TargetType = target;
 			HandlerType = handler;
 		}

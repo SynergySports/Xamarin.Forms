@@ -257,7 +257,7 @@ namespace Xamarin.Forms.ControlGallery.MacOS
 				StartPressed40911();
 			};
 
-			page.Layout.Children.Add(button);
+			page._40911Layout.Children.Add(button);
 		}
 
 		public void StartPressed40911()
